@@ -21,14 +21,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Newspaper
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -129,7 +133,7 @@ fun HomeScreen(
             TestbookPassBanner()
         }
 
-        // Quick Action Grid (Testbook style icons)
+        // Quick Action Grid (3x3 Layout matching screenshot)
         item {
             Column {
                 Text(
@@ -139,12 +143,14 @@ fun HomeScreen(
                     color = TestbookNavy
                 )
                 Spacer(modifier = Modifier.height(10.dp))
+
+                // Row 1
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     QuickActionCard(
-                        title = if (languageMode == LanguageMode.MARATHI) "PYQ बँक" else "PYQ Vault",
+                        title = "PYQ Bank",
                         subtitle = "2020-2024",
                         icon = Icons.Default.MenuBook,
                         color = Color(0xFF0284C7),
@@ -152,16 +158,32 @@ fun HomeScreen(
                     ) { onNavigateTab(AppTab.PYQ_BANK) }
 
                     QuickActionCard(
-                        title = if (languageMode == LanguageMode.MARATHI) "टेस्ट सिरीज" else "Test Series",
+                        title = "FYQ",
+                        subtitle = "Expected Qs",
+                        icon = Icons.Default.AutoAwesome,
+                        color = Color(0xFFF59E0B),
+                        modifier = Modifier.weight(1f)
+                    ) { onNavigateTab(AppTab.PYQ_BANK) }
+
+                    QuickActionCard(
+                        title = "Mock Tests",
                         subtitle = "Full Mocks",
                         icon = Icons.Default.Assignment,
                         color = TestbookEmerald,
                         modifier = Modifier.weight(1f)
                     ) { onNavigateTab(AppTab.TEST_SERIES) }
+                }
 
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Row 2
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     QuickActionCard(
-                        title = if (languageMode == LanguageMode.MARATHI) "स्पीड टेस्ट" else "Speed Quiz",
-                        subtitle = "5-10 Mins",
+                        title = "Speed Test",
+                        subtitle = "Series Quiz",
                         icon = Icons.Default.FlashOn,
                         color = TestbookOrange,
                         modifier = Modifier.weight(1f)
@@ -171,12 +193,52 @@ fun HomeScreen(
                     }
 
                     QuickActionCard(
-                        title = if (languageMode == LanguageMode.MARATHI) "सेव्हड प्रश्न" else "Saved Qs",
-                        subtitle = "Revision",
-                        icon = Icons.Default.Bookmark,
+                        title = "Syllabus",
+                        subtitle = "MPSC Pattern",
+                        icon = Icons.Default.ViewList,
                         color = Color(0xFF8B5CF6),
                         modifier = Modifier.weight(1f)
+                    ) { onNavigateTab(AppTab.PYQ_BANK) }
+
+                    QuickActionCard(
+                        title = "Current Affairs",
+                        subtitle = "Daily Digest",
+                        icon = Icons.Default.Newspaper,
+                        color = Color(0xFF0D9488),
+                        modifier = Modifier.weight(1f)
+                    ) { onNavigateTab(AppTab.HOME) }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Row 3
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    QuickActionCard(
+                        title = "Study Material",
+                        subtitle = "PDFs & Notes",
+                        icon = Icons.Default.Description,
+                        color = Color(0xFF4F46E5),
+                        modifier = Modifier.weight(1f)
+                    ) { onNavigateTab(AppTab.PYQ_BANK) }
+
+                    QuickActionCard(
+                        title = "Saved Qs",
+                        subtitle = "Revision",
+                        icon = Icons.Default.Bookmark,
+                        color = Color(0xFFEF4444),
+                        modifier = Modifier.weight(1f)
                     ) { onNavigateTab(AppTab.BOOKMARKS) }
+
+                    QuickActionCard(
+                        title = "TiDB Live",
+                        subtitle = "Cloud Qs",
+                        icon = Icons.Default.Cloud,
+                        color = Color(0xFF06B6D4),
+                        modifier = Modifier.weight(1f)
+                    ) { onNavigateTab(AppTab.PYQ_BANK) }
                 }
             }
         }

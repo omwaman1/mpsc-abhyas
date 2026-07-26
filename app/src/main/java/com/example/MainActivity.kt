@@ -19,20 +19,27 @@ import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.components.MPSCNavigationDrawerContent
 import com.example.ui.components.TopHeaderBar
 import com.example.ui.screens.AnalyticsScreen
 import com.example.ui.screens.BookmarksScreen
@@ -42,10 +49,10 @@ import com.example.ui.screens.TestResultScreen
 import com.example.ui.screens.TestRunnerScreen
 import com.example.ui.screens.TestSeriesScreen
 import com.example.ui.theme.MPSCPrepTheme
-import com.example.ui.theme.TestbookEmerald
 import com.example.ui.theme.TestbookNavy
 import com.example.ui.viewmodel.AppTab
 import com.example.ui.viewmodel.MPSCViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -103,11 +110,45 @@ class MainActivity : ComponentActivity() {
 
                     // Main App Navigation
                     else -> {
+                        val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                        val scope = rememberCoroutineScope()
+
+                        var pyqHeaderTitle by remember { mutableStateOf<String?>(null) }
+                        var pyqHeaderSubtitle by remember { mutableStateOf<String?>(null) }
+                        var pyqBackAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+                        val (defaultTitle, defaultSubtitle) = when (selectedTab) {
+                            AppTab.HOME -> "MPSC PREP" to "Testbook Series & PYQ Bank"
+                            AppTab.PYQ_BANK -> "PYQ Bank" to "Subject-wise, Exam-wise & Year-wise PYQs"
+                            AppTab.TEST_SERIES -> "Test Series" to "Full Length & Topic Mock Tests"
+                            AppTab.ANALYTICS -> "Analytics" to "Performance Insights & History"
+                            AppTab.BOOKMARKS -> "Saved Questions" to "Your Bookmarked PYQs"
+                        }
+
+                        // Reset sub-screen header when switching tabs
+                        androidx.compose.runtime.LaunchedEffect(selectedTab) {
+                            pyqHeaderTitle = null
+                            pyqHeaderSubtitle = null
+                            pyqBackAction = null
+                        }
+
+                        ModalNavigationDrawer(
+                            drawerState = drawerState,
+                            drawerContent = {
+                                MPSCNavigationDrawerContent(
+                                    selectedTab = selectedTab,
+                                    onTabSelected = { viewModel.setSelectedTab(it) },
+                                    onCloseDrawer = { scope.launch { drawerState.close() } }
+                                )
+                            }
+                        ) {
                         Scaffold(
                             topBar = {
                                 TopHeaderBar(
-                                    currentLanguage = selectedLanguage,
-                                    onLanguageToggle = { viewModel.toggleAppLanguage() }
+                                    title = pyqHeaderTitle ?: defaultTitle,
+                                    subtitle = pyqHeaderSubtitle ?: defaultSubtitle,
+                                    backAction = pyqBackAction,
+                                    onMenuClick = { scope.launch { drawerState.open() } }
                                 )
                             },
                             bottomBar = {
@@ -218,15 +259,11 @@ class MainActivity : ComponentActivity() {
                                     )
 
                                     AppTab.PYQ_BANK -> PYQBankScreen(
-                                        questions = filteredPYQs,
-                                        languageMode = selectedLanguage,
-                                        selectedExam = selectedExamFilter,
-                                        selectedSubject = selectedSubjectFilter,
-                                        selectedYear = selectedYearFilter,
-                                        onExamFilterChanged = { viewModel.selectedExamFilter.value = it },
-                                        onSubjectFilterChanged = { viewModel.selectedSubjectFilter.value = it },
-                                        onYearFilterChanged = { viewModel.selectedYearFilter.value = it },
-                                        onToggleBookmark = { id, bm -> viewModel.toggleBookmark(id, bm) }
+                                        onHeaderUpdate = { t, s, b ->
+                                            pyqHeaderTitle = t
+                                            pyqHeaderSubtitle = s
+                                            pyqBackAction = b
+                                        }
                                     )
 
                                     AppTab.TEST_SERIES -> TestSeriesScreen(
@@ -249,6 +286,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
+                        } // end ModalNavigationDrawer
                     }
                 }
             }

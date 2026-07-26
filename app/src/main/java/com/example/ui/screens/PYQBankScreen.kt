@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,250 +16,496 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.entities.QuestionEntity
+import com.example.data.remote.ApiExamCategory
+import com.example.data.remote.ApiSubject
+import com.example.data.remote.ApiYearCategory
+import com.example.data.remote.RetrofitClient
 import com.example.ui.theme.TestbookEmerald
 import com.example.ui.theme.TestbookGold
 import com.example.ui.theme.TestbookNavy
 import com.example.ui.viewmodel.LanguageMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+enum class PYQViewMode {
+    SUBJECT_WISE, EXAM_WISE, YEAR_WISE
+}
 
 @Composable
 fun PYQBankScreen(
-    questions: List<QuestionEntity>,
-    languageMode: LanguageMode,
-    selectedExam: String,
-    selectedSubject: String,
-    selectedYear: String,
-    onExamFilterChanged: (String) -> Unit,
-    onSubjectFilterChanged: (String) -> Unit,
-    onYearFilterChanged: (String) -> Unit,
-    onToggleBookmark: (Int, Boolean) -> Unit,
+    onHeaderUpdate: (title: String?, subtitle: String?, backAction: (() -> Unit)?) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
-    val examOptions = listOf("All Exams", "Rajyaseva", "Combine", "Subordinate")
-    val subjectOptions = listOf("All Subjects", "इतिहास", "भूगोल", "राज्यशास्त्र", "अर्थशास्त्र", "सामान्य विज्ञान", "CSAT")
-    val yearOptions = listOf("All Years", "2024", "2023", "2022", "2021")
+    var viewMode by remember { mutableStateOf(PYQViewMode.SUBJECT_WISE) }
+    var subjects by remember { mutableStateOf<List<ApiSubject>>(emptyList()) }
+    var exams by remember { mutableStateOf<List<ApiExamCategory>>(emptyList()) }
+    var years by remember { mutableStateOf<List<ApiYearCategory>>(emptyList()) }
+    var isConnected by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    var isStudyMode by remember { mutableStateOf(true) }
+    // Navigation state for Subject drill-down
+    var selectedSubjectId by remember { mutableStateOf<Int?>(null) }
+    var selectedSubjectName by remember { mutableStateOf("") }
+    var selectedTopicId by remember { mutableStateOf<Int?>(null) }
+    var selectedTopicName by remember { mutableStateOf("") }
 
-    LazyColumn(
+    // Navigation state for Exam drill-down
+    var selectedExamCategory by remember { mutableStateOf<String?>(null) }
+    var selectedExamCategoryPyqs by remember { mutableStateOf(0) }
+    var selectedExamYearName by remember { mutableStateOf<String?>(null) }
+    var selectedExamYearLabel by remember { mutableStateOf<String?>(null) }
+    var isAllYearsSelected by remember { mutableStateOf(false) }
+
+    // Navigation state for Year-wise drill-down
+    var selectedYearCategory by remember { mutableStateOf<String?>(null) }
+    var selectedYearCategoryPyqs by remember { mutableStateOf(0) }
+    var selectedYearExamName by remember { mutableStateOf<String?>(null) }
+
+    // Update parent main top bar dynamically
+    LaunchedEffect(
+        selectedTopicId, selectedSubjectId, selectedExamYearName,
+        isAllYearsSelected, selectedExamCategory, selectedYearExamName, selectedYearCategory
+    ) {
+        when {
+            selectedTopicId != null -> {
+                onHeaderUpdate(selectedTopicName, "Question Practice", { selectedTopicId = null })
+            }
+            selectedSubjectId != null -> {
+                onHeaderUpdate(selectedSubjectName, "Select Topic to Practice", { selectedSubjectId = null })
+            }
+            selectedExamYearName != null -> {
+                onHeaderUpdate("$selectedExamCategory - $selectedExamYearLabel", "Question Practice", { selectedExamYearName = null })
+            }
+            isAllYearsSelected && selectedExamCategory != null -> {
+                onHeaderUpdate("$selectedExamCategory (All Years)", "Question Practice", { isAllYearsSelected = false })
+            }
+            selectedExamCategory != null -> {
+                onHeaderUpdate(selectedExamCategory, "Select Year ($selectedExamCategoryPyqs Questions)", { selectedExamCategory = null })
+            }
+            selectedYearExamName != null -> {
+                onHeaderUpdate(selectedYearExamName, "Question Practice", { selectedYearExamName = null })
+            }
+            selectedYearCategory != null -> {
+                onHeaderUpdate("Year $selectedYearCategory Exams", "Select Exam to Practice", { selectedYearCategory = null })
+            }
+            else -> {
+                onHeaderUpdate(null, null, null)
+            }
+        }
+    }
+
+    when {
+        selectedTopicId != null -> {
+            QuestionAttemptScreen(
+                topicId = selectedTopicId!!,
+                title = selectedTopicName,
+                onBack = { selectedTopicId = null }
+            )
+        }
+        selectedSubjectId != null -> {
+            TopicListScreen(
+                subjectId = selectedSubjectId!!,
+                subjectName = selectedSubjectName,
+                onBack = { selectedSubjectId = null },
+                onTopicSelected = { tId, tName ->
+                    selectedTopicId = tId
+                    selectedTopicName = tName
+                }
+            )
+        }
+        selectedExamYearName != null -> {
+            QuestionAttemptScreen(
+                examName = selectedExamYearName,
+                title = "$selectedExamCategory - $selectedExamYearLabel",
+                onBack = { selectedExamYearName = null }
+            )
+        }
+        isAllYearsSelected && selectedExamCategory != null -> {
+            QuestionAttemptScreen(
+                examCategory = selectedExamCategory,
+                title = "$selectedExamCategory (All Years)",
+                onBack = { isAllYearsSelected = false }
+            )
+        }
+        selectedExamCategory != null -> {
+            ExamYearListScreen(
+                categoryName = selectedExamCategory!!,
+                totalPyqs = selectedExamCategoryPyqs,
+                onBack = { selectedExamCategory = null },
+                onYearSelected = { rawExamName, yearLabel ->
+                    selectedExamYearName = rawExamName
+                    selectedExamYearLabel = yearLabel
+                },
+                onAllYearsSelected = { category ->
+                    isAllYearsSelected = true
+                }
+            )
+        }
+        selectedYearExamName != null -> {
+            QuestionAttemptScreen(
+                examName = selectedYearExamName,
+                title = selectedYearExamName!!,
+                onBack = { selectedYearExamName = null }
+            )
+        }
+        selectedYearCategory != null -> {
+            YearExamListScreen(
+                yearLabel = selectedYearCategory!!,
+                totalPyqs = selectedYearCategoryPyqs,
+                onBack = { selectedYearCategory = null },
+                onExamSelected = { rawExamName, _ ->
+                    selectedYearExamName = rawExamName
+                }
+            )
+        }
+        else -> {
+
+    // Fetch data on first composition
+    LaunchedEffect(Unit) {
+        try {
+            isLoading = true
+            withContext(Dispatchers.IO) {
+                val healthResp = RetrofitClient.apiService.healthCheck()
+                isConnected = healthResp.status == "success"
+
+                val subjectsResp = RetrofitClient.apiService.getSubjects()
+                if (subjectsResp.status == "success") {
+                    subjects = subjectsResp.data
+                }
+
+                val examsResp = RetrofitClient.apiService.getExams()
+                if (examsResp.status == "success") {
+                    exams = examsResp.data
+                }
+
+                val yearsResp = RetrofitClient.apiService.getYears()
+                if (yearsResp.status == "success") {
+                    years = yearsResp.data
+                }
+            }
+            errorMessage = null
+        } catch (e: Exception) {
+            errorMessage = e.message
+            isConnected = false
+        } finally {
+            isLoading = false
+        }
+    }
+
+    Column(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFF1F5F9))
-            .testTag("pyq_bank_lazy_column"),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .testTag("pyq_bank_screen")
     ) {
-        // Mode Header & Switch
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = TestbookNavy),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (languageMode == LanguageMode.MARATHI) "MPSC मूळ प्रश्नपत्रिका (PYQ Archive)" else "MPSC Question Bank (PYQs)",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
-                        Text(
-                            text = if (isStudyMode) "अभ्यास मोड (उत्तर व स्पष्टीकरणासह)" else "सरावासाठी उत्तर लपवा",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 11.sp
-                        )
-                    }
+        Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (languageMode == LanguageMode.MARATHI) "अभ्यास मोड" else "Study Mode",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Switch(
-                            checked = isStudyMode,
-                            onCheckedChange = { isStudyMode = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = TestbookEmerald
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        // Exam Chips Filter
-        item {
-            Column {
-                Text(
-                    text = if (languageMode == LanguageMode.MARATHI) "परीक्षा (Exam):" else "Exam Filter:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF475569)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(examOptions) { opt ->
-                        FilterChip(
-                            selected = (selectedExam == opt),
-                            onClick = { onExamFilterChanged(opt) },
-                            label = { Text(opt, fontSize = 11.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = TestbookNavy,
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        // Subject Chips Filter
-        item {
-            Column {
-                Text(
-                    text = if (languageMode == LanguageMode.MARATHI) "विषय (Subject):" else "Subject Filter:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF475569)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(subjectOptions) { opt ->
-                        FilterChip(
-                            selected = (selectedSubject == opt),
-                            onClick = { onSubjectFilterChanged(opt) },
-                            label = { Text(opt, fontSize = 11.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = TestbookNavy,
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        // Year Filter
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        // Subject-wise / Exam-wise / Year-wise Toggle Tabs (3 Tabs)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            // Subject-wise tab
+            Button(
+                onClick = { viewMode = PYQViewMode.SUBJECT_WISE },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (viewMode == PYQViewMode.SUBJECT_WISE) TestbookNavy else Color.White
+                ),
+                contentPadding = PaddingValues(vertical = 12.dp)
             ) {
                 Text(
-                    text = "${questions.size} ${if (languageMode == LanguageMode.MARATHI) "प्रश्न सापडले" else "Questions found"}",
-                    fontSize = 13.sp,
+                    text = "विषयवार",
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TestbookNavy
+                    color = if (viewMode == PYQViewMode.SUBJECT_WISE) Color.White else Color(0xFF475569)
                 )
+            }
 
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(yearOptions) { yr ->
-                        FilterChip(
-                            selected = (selectedYear == yr),
-                            onClick = { onYearFilterChanged(yr) },
-                            label = { Text(yr, fontSize = 10.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = TestbookEmerald,
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-                }
+            // Exam-wise tab
+            Button(
+                onClick = { viewMode = PYQViewMode.EXAM_WISE },
+                modifier = Modifier
+                    .weight(1f)
+                    .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(0.dp)),
+                shape = RoundedCornerShape(0.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (viewMode == PYQViewMode.EXAM_WISE) TestbookNavy else Color.White
+                ),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                Text(
+                    text = "परीक्षावार",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (viewMode == PYQViewMode.EXAM_WISE) Color.White else Color(0xFF475569)
+                )
+            }
+
+            // Year-wise tab
+            Button(
+                onClick = { viewMode = PYQViewMode.YEAR_WISE },
+                modifier = Modifier
+                    .weight(1f)
+                    .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)),
+                shape = RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (viewMode == PYQViewMode.YEAR_WISE) TestbookNavy else Color.White
+                ),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                Text(
+                    text = "वर्षवार",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (viewMode == PYQViewMode.YEAR_WISE) Color.White else Color(0xFF475569)
+                )
             }
         }
 
-        // Questions List
-        if (questions.isEmpty()) {
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 24.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "कोणतेही प्रश्न सापडले नाहीत.",
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF64748B)
-                        )
-                        Text(
-                            text = "कृपया फिल्टर पर्याय बदला.",
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Content Area
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = TestbookNavy)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Fetching from TiDB Cloud...",
+                        fontSize = 13.sp,
+                        color = Color(0xFF64748B)
+                    )
+                }
+            }
+        } else if (errorMessage != null) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Connection Error",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFEF4444)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = errorMessage ?: "Unknown error",
+                        fontSize = 12.sp,
+                        color = Color(0xFF64748B)
+                    )
                 }
             }
         } else {
-            items(questions) { question ->
-                PYQCardItem(
-                    question = question,
-                    languageMode = languageMode,
-                    isStudyMode = isStudyMode,
-                    onToggleBookmark = { onToggleBookmark(question.id, question.isBookmarked) }
+            when (viewMode) {
+                PYQViewMode.SUBJECT_WISE -> {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        itemsIndexed(subjects) { index, subject ->
+                            SubjectExamCard(
+                                number = String.format("%02d", index + 1),
+                                titleMr = subject.nameMr,
+                                titleEn = subject.nameEn,
+                                pyqCount = subject.pyqCount,
+                                onClick = {
+                                    selectedSubjectId = subject.id.toIntOrNull() ?: 0
+                                    selectedSubjectName = subject.nameMr.ifEmpty { subject.nameEn }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                PYQViewMode.EXAM_WISE -> {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        itemsIndexed(exams) { index, examCategory ->
+                            SubjectExamCard(
+                                number = String.format("%02d", index + 1),
+                                titleMr = examCategory.categoryName,
+                                titleEn = "${examCategory.yearCount} Years",
+                                pyqCount = "${examCategory.pyqCount}",
+                                onClick = {
+                                    selectedExamCategory = examCategory.categoryName
+                                    selectedExamCategoryPyqs = examCategory.pyqCount
+                                }
+                            )
+                        }
+                    }
+                }
+
+                PYQViewMode.YEAR_WISE -> {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        itemsIndexed(years) { index, yearCategory ->
+                            SubjectExamCard(
+                                number = String.format("%02d", index + 1),
+                                titleMr = "वर्ष ${yearCategory.year}",
+                                titleEn = "${yearCategory.examCount} Exams",
+                                pyqCount = "${yearCategory.pyqCount}",
+                                onClick = {
+                                    selectedYearCategory = yearCategory.year
+                                    selectedYearCategoryPyqs = yearCategory.pyqCount
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+        }
+    }
+}
+
+@Composable
+fun SubjectExamCard(
+    number: String,
+    titleMr: String,
+    titleEn: String,
+    pyqCount: String,
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Number
+            Text(
+                text = number,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF94A3B8)
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Vertical divider
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .height(40.dp)
+                    .background(Color(0xFFE2E8F0))
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Title and PYQ count
+            Column(modifier = Modifier.weight(1f)) {
+                if (titleEn.isNotEmpty()) {
+                    Text(
+                        text = "$titleMr ($titleEn)",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E293B),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 17.sp
+                    )
+                } else {
+                    Text(
+                        text = titleMr,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E293B),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 17.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "$pyqCount प्रश्न (PYQs)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TestbookEmerald
                 )
             }
         }
     }
 }
 
+// PYQCardItem - Used by BookmarksScreen to display individual question cards
 @Composable
 fun PYQCardItem(
     question: QuestionEntity,
@@ -331,7 +579,7 @@ fun PYQCardItem(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Question Text (Marathi / English based on setting or dual display)
+            // Question Text
             Text(
                 text = if (languageMode == LanguageMode.MARATHI) "प्र. ${question.id}. ${question.questionMarathi}" else "Q${question.id}. ${question.questionEnglish}",
                 fontSize = 14.sp,
@@ -388,7 +636,7 @@ fun PYQCardItem(
                         },
                     shape = RoundedCornerShape(8.dp),
                     color = optionBg,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, optionBorder)
+                    border = BorderStroke(1.dp, optionBorder)
                 ) {
                     Row(
                         modifier = Modifier.padding(10.dp),
@@ -468,7 +716,7 @@ fun PYQCardItem(
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = Color(0xFFEFF6FF),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFBFDBFE))
+                    border = BorderStroke(1.dp, Color(0xFFBFDBFE))
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
