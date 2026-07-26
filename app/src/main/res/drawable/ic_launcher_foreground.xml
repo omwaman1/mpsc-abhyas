@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Graduation Cap / Study emblem -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M54,32L28,45l26,13l26,-13z" />
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M34,53.5v12.5c0,5.5 9,10 20,10s20,-4.5 20,-10v-12.5l-20,10z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M74,48v16h3v-16z" />
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M75.5,64m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0" />
+</vector>

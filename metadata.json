@@ -1,0 +1,6 @@
+{
+  "name": "MPSC Prep - Question Bank & Tests",
+  "description": "Information-rich MPSC Question Bank and Mock Test Series inspired by Testbook with PYQ archives, live test engine, Marathi bilingual solutions, and analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

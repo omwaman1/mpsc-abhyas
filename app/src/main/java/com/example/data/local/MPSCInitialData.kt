@@ -1,0 +1,308 @@
+package com.example.data.local
+
+import com.example.data.local.entities.CurrentAffairsEntity
+import com.example.data.local.entities.QuestionEntity
+import com.example.data.local.entities.TestPaperEntity
+
+object MPSCInitialData {
+
+    fun getInitialQuestions(): List<QuestionEntity> {
+        return listOf(
+            QuestionEntity(
+                id = 1,
+                examType = "Rajyaseva Prelims",
+                subject = "इतिहास (History)",
+                year = 2024,
+                questionMarathi = "१८५७ च्या उठावात महाराष्ट्रातून कोल्हापूर क्षेत्रातून मुख्य नेतृत्व कोणी केले होते?",
+                questionEnglish = "Who led the main revolt in Kolhapur region during the 1857 uprising in Maharashtra?",
+                option1Marathi = "चिमासाहेब (Chima Saheb)",
+                option1English = "Chima Saheb",
+                option2Marathi = "बाबासाहेब भावे (Babasaheb Bhave)",
+                option2English = "Babasaheb Bhave",
+                option3Marathi = "भगवंतराव निपाणकर (Bhagwantrao Nipankar)",
+                option3English = "Bhagwantrao Nipankar",
+                option4Marathi = "रंगो बापूजी गुप्ते (Rango Bapuji Gupte)",
+                option4English = "Rango Bapuji Gupte",
+                correctOption = 1,
+                explanationMarathi = "१८५७ च्या उठावात कोल्हापुरात छत्रपतींचे धाकटे बंधू चिमासाहेब यांनी नेतृत्व केले होते. ३१ जुलै १८५७ रोजी २७ व्या देशी पायदळ तुकडीने बंड पुकारले होते.",
+                explanationEnglish = "During the 1857 revolt, Chima Saheb (younger brother of Chhatrapati) led the uprising in Kolhapur. The 27th Native Infantry raised standard of revolt on 31st July 1857.",
+                difficulty = "Medium",
+                tags = "1857 Revolt, Maharashtra History, Kolhapur"
+            ),
+            QuestionEntity(
+                id = 2,
+                examType = "Rajyaseva Prelims",
+                subject = "राज्यशास्त्र (Polity)",
+                year = 2024,
+                questionMarathi = "भारतीय संविधानातील कलम २४३-I नुसार राज्य वित्त आयोगाची (State Finance Commission) स्थापना कोणाद्वारे केली जाते?",
+                questionEnglish = "Under Article 243-I of the Indian Constitution, who constitutes the State Finance Commission?",
+                option1Marathi = "मुख्यमंत्री (Chief Minister)",
+                option1English = "Chief Minister",
+                option2Marathi = "राज्यपाल (Governor)",
+                option2English = "Governor",
+                option3Marathi = "विधानसभा अध्यक्ष (Speaker of Legislative Assembly)",
+                option3English = "Speaker of Legislative Assembly",
+                option4Marathi = "राज्य निवडणूक आयुक्त (State Election Commissioner)",
+                option4English = "State Election Commissioner",
+                correctOption = 2,
+                explanationMarathi = "कलम २४३-I नुसार, प्रत्येक राज्याचा राज्यपाल दर ५ वर्षांनी पंचायतींच्या आर्थिक स्थितीचे पुनरावलोकन करण्यासाठी राज्य वित्त आयोगाची स्थापना करतो.",
+                explanationEnglish = "According to Article 243-I, the Governor of a state constitutes a State Finance Commission every 5 years to review the financial position of Panchayats.",
+                difficulty = "Medium",
+                tags = "Polity, Article 243, Finance Commission, Governor"
+            ),
+            QuestionEntity(
+                id = 3,
+                examType = "Combine Group B & C",
+                subject = "भूगोल (Geography)",
+                year = 2023,
+                questionMarathi = "महाराष्ट्रातील खालीलपैकी कोणता जलविद्युत प्रकल्प 'महाराष्ट्राची भाग्यलक्ष्मी' म्हणून ओळखला जातो?",
+                questionEnglish = "Which of the following hydroelectric projects in Maharashtra is known as 'Bhagyalakshmi of Maharashtra'?",
+                option1Marathi = "कोयना जलविद्युत प्रकल्प (Koyna)",
+                option1English = "Koyna Hydroelectric Project",
+                option2Marathi = "जायकवाडी प्रकल्प (Jayakwadi)",
+                option2English = "Jayakwadi Project",
+                option3Marathi = "राधानगरी प्रकल्प (Radhanagari)",
+                option3English = "Radhanagari Project",
+                option4Marathi = "भंडारदरा प्रकल्प (Bhandardara)",
+                option4English = "Bhandardara Project",
+                correctOption = 1,
+                explanationMarathi = "सातारा जिल्ह्यातील कोयना नदीवरील कोयना जलविद्युत प्रकल्प हा महाराष्ट्रातील सर्वात मोठा जलविद्युत प्रकल्प आहे. त्यामुळे याला महाराष्ट्राची भाग्यलक्ष्मी म्हणतात.",
+                explanationEnglish = "Koyna Hydroelectric Project built on Koyna river in Satara district is the largest completed hydroelectric power project in Maharashtra and called 'Bhagyalakshmi of Maharashtra'.",
+                difficulty = "Easy",
+                tags = "Maharashtra Geography, Dams, Koyna"
+            ),
+            QuestionEntity(
+                id = 4,
+                examType = "Rajyaseva Prelims",
+                subject = "अर्थशास्त्र (Economics)",
+                year = 2023,
+                questionMarathi = "भारतात 'हरित क्रांती' चे जनक म्हणून कोणाला ओळखले जाते?",
+                questionEnglish = "Who is known as the Father of Green Revolution in India?",
+                option1Marathi = "डॉ. वर्गीस कुरियन (Dr. Verghese Kurien)",
+                option1English = "Dr. Verghese Kurien",
+                option2Marathi = "डॉ. एम. एस. स्वामीनाथन (Dr. M. S. Swaminathan)",
+                option2English = "Dr. M. S. Swaminathan",
+                option3Marathi = "सी. सुब्रह्मण्यम (C. Subramaniam)",
+                option3English = "C. Subramaniam",
+                option4Marathi = "डॉ. मनमोहन सिंग (Dr. Manmohan Singh)",
+                option4English = "Dr. Manmohan Singh",
+                correctOption = 2,
+                explanationMarathi = "डॉ. एम. एस. स्वामीनाथन यांनी १९६० च्या दशकात भारतात उच्च उत्पन्न देणाऱ्या गव्हाच्या व तांदळाच्या वाणांची ओळख करून दिली. त्यांना नुकतेच २०२४ मध्ये भारतरत्न प्रदान करण्यात आले.",
+                explanationEnglish = "Dr. M. S. Swaminathan led the Green Revolution in India in 1960s introducing HYV seeds for Wheat and Rice. He was awarded Bharat Ratna posthumously in 2024.",
+                difficulty = "Easy",
+                tags = "Economics, Green Revolution, Agriculture"
+            ),
+            QuestionEntity(
+                id = 5,
+                examType = "Combine Group B & C",
+                subject = "सामान्य विज्ञान (General Science)",
+                year = 2023,
+                questionMarathi = "मानवी रक्ताचा pH मूल्य साधारणपणे किती असतो?",
+                questionEnglish = "What is the approximate pH value of human blood?",
+                option1Marathi = "६.० - ६.४",
+                option1English = "6.0 - 6.4",
+                option2Marathi = "७.३५ - ७.४५",
+                option2English = "7.35 - 7.45",
+                option3Marathi = "८.५ - ९.०",
+                option3English = "8.5 - 9.0",
+                option4Marathi = "५.५ - ६.०",
+                option4English = "5.5 - 6.0",
+                correctOption = 2,
+                explanationMarathi = "मानवी रक्त हे किंचित आम्लधर्मीय (Slightly Alkaline) असते आणि त्याचा pH साधारणपणे ७.३५ ते ७.४५ दरम्यान असतो.",
+                explanationEnglish = "Human blood is slightly basic/alkaline with a normal pH range of approximately 7.35 to 7.45.",
+                difficulty = "Medium",
+                tags = "Biology, Human Physiology, Blood pH"
+            ),
+            QuestionEntity(
+                id = 6,
+                examType = "Rajyaseva Prelims",
+                subject = "अंकगणित व बुद्धिमत्ता (CSAT)",
+                year = 2022,
+                questionMarathi = "एका रांगेत अजयचा क्रमांक डावीकडून १५ वा आणि उजवीकडून २१ वा आहे, तर त्या रांगेत एकूण किती मुले आहेत?",
+                questionEnglish = "In a row, Ajay's position is 15th from the left and 21st from the right. How many total boys are there in the row?",
+                option1Marathi = "३५",
+                option1English = "35",
+                option2Marathi = "३६",
+                option2English = "36",
+                option3Marathi = "३४",
+                option3English = "34",
+                option4Marathi = "३७",
+                option4English = "37",
+                correctOption = 1,
+                explanationMarathi = "एकूण मुले = (डावीकडून क्रमांक + उजवीकडून क्रमांक) - १ = (१५ + २१) - १ = ३६ - १ = ३५.",
+                explanationEnglish = "Total count = (Position from left + Position from right) - 1 = (15 + 21) - 1 = 35.",
+                difficulty = "Easy",
+                tags = "CSAT, Reasoning, Ranking Test"
+            ),
+            QuestionEntity(
+                id = 7,
+                examType = "Rajyaseva Prelims",
+                subject = "इतिहास (History)",
+                year = 2022,
+                questionMarathi = "महाराष्ट्रातील सत्यशोधक समाजाची स्थापना १८७३ मध्ये कोणी केली होती?",
+                questionEnglish = "Who founded the Satyashodhak Samaj in Maharashtra in 1873?",
+                option1Marathi = "महर्षी विठ्ठल रामजी शिंदे (Maharshi V. R. Shinde)",
+                option1English = "Maharshi V. R. Shinde",
+                option2Marathi = "महात्मा ज्योतिराव फुले (Mahatma Jyotirao Phule)",
+                option2English = "Mahatma Jyotirao Phule",
+                option3Marathi = "छत्रपती शाहू महाराज (Chhatrapati Shahu Maharaj)",
+                option3English = "Chhatrapati Shahu Maharaj",
+                option4Marathi = "डॉ. बी. आर. आंबेडकर (Dr. B. R. Ambedkar)",
+                option4English = "Dr. B. R. Ambedkar",
+                correctOption = 2,
+                explanationMarathi = "२४ सप्टेंबर १८७३ रोजी पुणे येथे महात्मा ज्योतिराव फुले यांनी शोषित व बहुजन समाजाच्या पुनरुत्थानासाठी सत्यशोधक समाजाची स्थापना केली.",
+                explanationEnglish = "Mahatma Jyotirao Phule founded the Satyashodhak Samaj on 24 September 1873 in Pune to liberate the oppressed classes.",
+                difficulty = "Easy",
+                tags = "Satyashodhak Samaj, Mahatma Phule, Modern History"
+            ),
+            QuestionEntity(
+                id = 8,
+                examType = "Combine Group B & C",
+                subject = "राज्यशास्त्र (Polity)",
+                year = 2022,
+                questionMarathi = "भारतीय संविधानातील कोणत्या कलमाद्वारे घटकराज्यांमध्ये राष्ट्रपती राजवट (President's Rule) लागू केली जाते?",
+                questionEnglish = "Under which Article of the Indian Constitution can President's Rule be imposed in a state?",
+                option1Marathi = "कलम ३५२ (Article 352)",
+                option1English = "Article 352",
+                option2Marathi = "कलम ३५६ (Article 356)",
+                option2English = "Article 356",
+                option3Marathi = "कलम ३६० (Article 360)",
+                option3English = "Article 360",
+                option4Marathi = "कलम ३६८ (Article 368)",
+                option4English = "Article 368",
+                correctOption = 2,
+                explanationMarathi = "कलम ३५६ अंतर्गत राज्यामध्ये घटनात्मक यंत्रणा अयशस्वी झाल्यास राष्ट्रपती राजवट लागू केली जाते. कलम ३५२ राष्ट्रीय आणीबाणी व कलम ३६० आर्थिक आणीबाणीशी संबंधित आहे.",
+                explanationEnglish = "Article 356 empowers President's Rule when state constitutional machinery fails. Article 352 is National Emergency and Article 360 is Financial Emergency.",
+                difficulty = "Medium",
+                tags = "Polity, Article 356, Emergency Provisions"
+            ),
+            QuestionEntity(
+                id = 9,
+                examType = "Rajyaseva Prelims",
+                subject = "चालू घडामोडी (Current Affairs)",
+                year = 2024,
+                questionMarathi = "महाराष्ट्र शासनाने नुकतीच सुरु केलेली 'मुख्यमंत्री माझी लाडकी बहीण योजना' कोणत्या वयोगटातील महिलांसाठी लागू आहे?",
+                questionEnglish = "The 'Mukhyamantri Majhi Ladki Bahin Yojana' introduced by Government of Maharashtra applies to women in which age group?",
+                option1Marathi = "१८ ते ६० वर्षे (18 to 60 years)",
+                option1English = "18 to 60 years",
+                option2Marathi = "२१ ते ६५ वर्षे (21 to 65 years)",
+                option2English = "21 to 65 years",
+                option3Marathi = "२१ ते ६० वर्षे (21 to 60 years)",
+                option3English = "21 to 60 years",
+                option4Marathi = "१८ ते ५० वर्षे (18 to 50 years)",
+                option4English = "18 to 50 years",
+                correctOption = 2,
+                explanationMarathi = "महाराष्ट्र शासनाने महिलांच्या आर्थिक स्वावलंबनासाठी २१ ते ६५ वयोगटातील पात्र महिलांना दरमहा रु. १५०० आर्थिक मदत देणारी लाडकी बहीण योजना सुरु केली.",
+                explanationEnglish = "Government of Maharashtra launched Majhi Ladki Bahin scheme providing Rs. 1500 monthly assistance to eligible women aged 21 to 65 years.",
+                difficulty = "Easy",
+                tags = "Maharashtra Government Schemes, Current Affairs 2024"
+            ),
+            QuestionEntity(
+                id = 10,
+                examType = "Combine Group B & C",
+                subject = "भूगोल (Geography)",
+                year = 2021,
+                questionMarathi = "महाराष्ट्रातील दक्षिणोत्तर वाहणारी सर्वात मोठी नदी प्रणाली कोणती?",
+                questionEnglish = "Which river system forms the main drainage basin covering largest area in Maharashtra?",
+                option1Marathi = "भीमा नदी (Bhima)",
+                option1English = "Bhima River",
+                option2Marathi = "गोदावरी नदी (Godavari)",
+                option2English = "Godavari River",
+                option3Marathi = "कृष्णा नदी (Krishna)",
+                option3English = "Krishna River",
+                option4Marathi = "तापी नदी (Tapi)",
+                option4English = "Tapi River",
+                correctOption = 2,
+                explanationMarathi = "गोदावरी नदी ही महाराष्ट्रातील सर्वात लांब नदी असून ती महाराष्ट्राच्या सुमारे ४९% क्षेत्राला व्यापते. हिला 'दक्षिण गंगा' असेही म्हणतात.",
+                explanationEnglish = "Godavari is the longest river in Maharashtra covering around 49% of the state's total geographical area, also known as Dakshin Ganga.",
+                difficulty = "Easy",
+                tags = "Maharashtra Geography, Godavari River System"
+            )
+        )
+    }
+
+    fun getInitialTestPapers(): List<TestPaperEntity> {
+        return listOf(
+            TestPaperEntity(
+                testId = "MPSC_RAJYASEVA_MOCK_1",
+                title = "MPSC Rajyaseva Prelims 2026 Full Mock Test 1",
+                category = "Full Mock Test",
+                examType = "Rajyaseva Prelims",
+                questionCount = 10,
+                totalMarks = 20,
+                durationMinutes = 15,
+                attemptsCount = 18420,
+                isFree = true,
+                questionIdsJson = "1,2,3,4,5,6,7,8,9,10"
+            ),
+            TestPaperEntity(
+                testId = "MPSC_POLITY_SPECIAL_1",
+                title = "MPSC State Polity & Constitution Booster",
+                category = "Subject Test",
+                examType = "Rajyaseva & Combine",
+                questionCount = 5,
+                totalMarks = 10,
+                durationMinutes = 8,
+                attemptsCount = 12900,
+                isFree = true,
+                questionIdsJson = "2,8,1,4,9"
+            ),
+            TestPaperEntity(
+                testId = "MPSC_COMBINE_PYQ_2023",
+                title = "MPSC Combine Group B & C (2023 PYQ Paper)",
+                category = "PYQ Paper",
+                examType = "Combine Group B & C",
+                questionCount = 6,
+                totalMarks = 12,
+                durationMinutes = 10,
+                attemptsCount = 24100,
+                isFree = true,
+                questionIdsJson = "3,4,5,8,9,10"
+            ),
+            TestPaperEntity(
+                testId = "MPSC_CSAT_SPEED_1",
+                title = "MPSC CSAT Reasoning & Quantitative Aptitude Test",
+                category = "Speed Test",
+                examType = "Rajyaseva Prelims",
+                questionCount = 4,
+                totalMarks = 8,
+                durationMinutes = 5,
+                attemptsCount = 9850,
+                isFree = true,
+                questionIdsJson = "6,4,2,10"
+            )
+        )
+    }
+
+    fun getInitialCurrentAffairs(): List<CurrentAffairsEntity> {
+        return listOf(
+            CurrentAffairsEntity(
+                id = 1,
+                titleMarathi = "भारतरत्न २०२४ - डॉ. एम. एस. स्वामीनाथन यांना मरणोत्तर सन्मान",
+                titleEnglish = "Bharat Ratna 2024 - Posthumous honour to Dr. M. S. Swaminathan",
+                summaryMarathi = "भारतीय हरित क्रांतीचे जनक डॉ. एम. एस. स्वामीनाथन यांना केंद्र सरकारतर्फे देशाचा सर्वोच्च नागरी पुरस्कार भारतरत्न प्रदान करण्यात आला.",
+                summaryEnglish = "Father of Indian Green Revolution Dr. M. S. Swaminathan was posthumously conferred India's highest civilian honour, the Bharat Ratna.",
+                category = "National & Economy",
+                date = "26 July 2026"
+            ),
+            CurrentAffairsEntity(
+                id = 2,
+                titleMarathi = "महाराष्ट्र पोलीस पदक पुरस्कार व राज्यस्तरीय उत्कृष्ट पोलीस पुरस्कार",
+                titleEnglish = "Maharashtra Police Medals & State Outstanding Police Awards",
+                summaryMarathi = "महाराष्ट्रातील कर्तबगार पोलीस अधिकाऱ्यांना विशेष सेवेसाठी मुख्यमंत्री सुवर्णपदक व पोलीस पदकाने सन्मानित करण्यात आले.",
+                summaryEnglish = "Distinguished police personnel from Maharashtra were awarded Chief Minister's Gold Medal for exceptional service.",
+                category = "Maharashtra Special",
+                date = "25 July 2026"
+            ),
+            CurrentAffairsEntity(
+                id = 3,
+                titleMarathi = "भारतीय वनांचे आच्छादन व महाराष्ट्र वनीकरण अहवाल २०२४-२६",
+                titleEnglish = "India Forest Status Report & Maharashtra Afforestation Stats",
+                summaryMarathi = "महाराष्ट्रातील पश्चिम घाट क्षेत्रात आणि गडचिरोली जिल्ह्यात वनक्षेत्रात १.८% ची महत्त्वपूर्ण वाढ नोंदवण्यात आली.",
+                summaryEnglish = "Maharashtra registered a 1.8% rise in forest canopy density across Western Ghats and Gadchiroli region.",
+                category = "Environment & Science",
+                date = "24 July 2026"
+            )
+        )
+    }
+}
