@@ -1,5 +1,11 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,14 +25,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -34,6 +51,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.entities.QuestionEntity
 import com.example.data.remote.ApiExamCategory
+import com.example.data.remote.ApiQuestion
 import com.example.data.remote.ApiSubject
 import com.example.data.remote.ApiYearCategory
 import com.example.data.remote.RetrofitClient
@@ -61,8 +81,21 @@ import com.example.ui.theme.TestbookEmerald
 import com.example.ui.theme.TestbookGold
 import com.example.ui.theme.TestbookNavy
 import com.example.ui.viewmodel.LanguageMode
+import com.example.util.cleanHtml
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+// In-memory session cache: Only fetch categories once per app session!
+private var pyqSubjectsCache: List<ApiSubject>? = null
+private var pyqExamsCache: List<ApiExamCategory>? = null
+private var pyqYearsCache: List<ApiYearCategory>? = null
+
+fun clearPYQBankSessionCache() {
+    pyqSubjectsCache = null
+    pyqExamsCache = null
+    pyqYearsCache = null
+}
 
 enum class PYQViewMode {
     SUBJECT_WISE, EXAM_WISE, YEAR_WISE
@@ -71,15 +104,26 @@ enum class PYQViewMode {
 @Composable
 fun PYQBankScreen(
     onHeaderUpdate: (title: String?, subtitle: String?, backAction: (() -> Unit)?) -> Unit = { _, _, _ -> },
+    onToggleQuestionMode: (Boolean) -> Unit = {},
+    onSaveQuestion: ((ApiQuestion, Boolean) -> Unit)? = null,
+    onReportQuestion: ((Int, String, String) -> Unit)? = null,
+    isVibrationEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    var viewMode by remember { mutableStateOf(PYQViewMode.SUBJECT_WISE) }
-    var subjects by remember { mutableStateOf<List<ApiSubject>>(emptyList()) }
-    var exams by remember { mutableStateOf<List<ApiExamCategory>>(emptyList()) }
-    var years by remember { mutableStateOf<List<ApiYearCategory>>(emptyList()) }
+    val context = LocalContext.current
+    var reportingQuestionId by remember { mutableStateOf<Int?>(null) }
+    
+    // Pager state for smooth Left/Right horizontal swiping
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
+    val coroutineScope = rememberCoroutineScope()
+
+    var subjects by remember { mutableStateOf<List<ApiSubject>>(pyqSubjectsCache ?: emptyList()) }
+    var exams by remember { mutableStateOf<List<ApiExamCategory>>(pyqExamsCache ?: emptyList()) }
+    var years by remember { mutableStateOf<List<ApiYearCategory>>(pyqYearsCache ?: emptyList()) }
     var isConnected by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(true) }
+    var isLoading by remember { mutableStateOf(pyqSubjectsCache == null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableStateOf(0) }
 
     // Navigation state for Subject drill-down
     var selectedSubjectId by remember { mutableStateOf<Int?>(null) }
@@ -90,9 +134,6 @@ fun PYQBankScreen(
     // Navigation state for Exam drill-down
     var selectedExamCategory by remember { mutableStateOf<String?>(null) }
     var selectedExamCategoryPyqs by remember { mutableStateOf(0) }
-    var selectedExamYearName by remember { mutableStateOf<String?>(null) }
-    var selectedExamYearLabel by remember { mutableStateOf<String?>(null) }
-    var isAllYearsSelected by remember { mutableStateOf(false) }
 
     // Navigation state for Year-wise drill-down
     var selectedYearCategory by remember { mutableStateOf<String?>(null) }
@@ -101,30 +142,26 @@ fun PYQBankScreen(
 
     // Update parent main top bar dynamically
     LaunchedEffect(
-        selectedTopicId, selectedSubjectId, selectedExamYearName,
-        isAllYearsSelected, selectedExamCategory, selectedYearExamName, selectedYearCategory
+        selectedTopicId, selectedSubjectId, selectedExamCategory,
+        selectedYearExamName, selectedYearCategory
     ) {
+        val isAttemptingQuestion = (selectedTopicId != null || selectedExamCategory != null || selectedYearExamName != null)
+        onToggleQuestionMode(isAttemptingQuestion)
         when {
             selectedTopicId != null -> {
-                onHeaderUpdate(selectedTopicName, "Question Practice", { selectedTopicId = null })
+                onHeaderUpdate(selectedTopicName, "Attempt Questions", { selectedTopicId = null })
             }
             selectedSubjectId != null -> {
-                onHeaderUpdate(selectedSubjectName, "Select Topic to Practice", { selectedSubjectId = null })
-            }
-            selectedExamYearName != null -> {
-                onHeaderUpdate("$selectedExamCategory - $selectedExamYearLabel", "Question Practice", { selectedExamYearName = null })
-            }
-            isAllYearsSelected && selectedExamCategory != null -> {
-                onHeaderUpdate("$selectedExamCategory (All Years)", "Question Practice", { isAllYearsSelected = false })
+                onHeaderUpdate(selectedSubjectName, "Select Topic", { selectedSubjectId = null })
             }
             selectedExamCategory != null -> {
-                onHeaderUpdate(selectedExamCategory, "Select Year ($selectedExamCategoryPyqs Questions)", { selectedExamCategory = null })
+                onHeaderUpdate(selectedExamCategory, "Exam PYQs", { selectedExamCategory = null })
             }
             selectedYearExamName != null -> {
-                onHeaderUpdate(selectedYearExamName, "Question Practice", { selectedYearExamName = null })
+                onHeaderUpdate(selectedYearExamName, "Year $selectedYearCategory PYQs", { selectedYearExamName = null })
             }
             selectedYearCategory != null -> {
-                onHeaderUpdate("Year $selectedYearCategory Exams", "Select Exam to Practice", { selectedYearCategory = null })
+                onHeaderUpdate("$selectedYearCategory Exams", "Select Exam Paper", { selectedYearCategory = null })
             }
             else -> {
                 onHeaderUpdate(null, null, null)
@@ -137,7 +174,9 @@ fun PYQBankScreen(
             QuestionAttemptScreen(
                 topicId = selectedTopicId!!,
                 title = selectedTopicName,
-                onBack = { selectedTopicId = null }
+                onBack = { selectedTopicId = null },
+                onSaveQuestion = onSaveQuestion,
+                isVibrationEnabled = isVibrationEnabled
             )
         }
         selectedSubjectId != null -> {
@@ -151,39 +190,23 @@ fun PYQBankScreen(
                 }
             )
         }
-        selectedExamYearName != null -> {
-            QuestionAttemptScreen(
-                examName = selectedExamYearName,
-                title = "$selectedExamCategory - $selectedExamYearLabel",
-                onBack = { selectedExamYearName = null }
-            )
-        }
-        isAllYearsSelected && selectedExamCategory != null -> {
+        selectedExamCategory != null -> {
             QuestionAttemptScreen(
                 examCategory = selectedExamCategory,
-                title = "$selectedExamCategory (All Years)",
-                onBack = { isAllYearsSelected = false }
-            )
-        }
-        selectedExamCategory != null -> {
-            ExamYearListScreen(
-                categoryName = selectedExamCategory!!,
-                totalPyqs = selectedExamCategoryPyqs,
+                title = selectedExamCategory!!,
                 onBack = { selectedExamCategory = null },
-                onYearSelected = { rawExamName, yearLabel ->
-                    selectedExamYearName = rawExamName
-                    selectedExamYearLabel = yearLabel
-                },
-                onAllYearsSelected = { category ->
-                    isAllYearsSelected = true
-                }
+                onSaveQuestion = onSaveQuestion,
+                isVibrationEnabled = isVibrationEnabled
             )
         }
         selectedYearExamName != null -> {
             QuestionAttemptScreen(
                 examName = selectedYearExamName,
-                title = selectedYearExamName!!,
-                onBack = { selectedYearExamName = null }
+                examYear = selectedYearCategory?.toIntOrNull(),
+                title = "$selectedYearExamName - $selectedYearCategory",
+                onBack = { selectedYearExamName = null },
+                onSaveQuestion = onSaveQuestion,
+                isVibrationEnabled = isVibrationEnabled
             )
         }
         selectedYearCategory != null -> {
@@ -198,10 +221,18 @@ fun PYQBankScreen(
         }
         else -> {
 
-    // Fetch data on first composition
-    LaunchedEffect(Unit) {
+    // Fetch data on first visit in session, and reuse cache for subsequent visits
+    LaunchedEffect(refreshKey) {
+        if (refreshKey == 0 && pyqSubjectsCache != null && pyqExamsCache != null && pyqYearsCache != null) {
+            subjects = pyqSubjectsCache!!
+            exams = pyqExamsCache!!
+            years = pyqYearsCache!!
+            isLoading = false
+            return@LaunchedEffect
+        }
+
         try {
-            isLoading = true
+            isLoading = (pyqSubjectsCache == null)
             withContext(Dispatchers.IO) {
                 val healthResp = RetrofitClient.apiService.healthCheck()
                 isConnected = healthResp.status == "success"
@@ -209,21 +240,24 @@ fun PYQBankScreen(
                 val subjectsResp = RetrofitClient.apiService.getSubjects()
                 if (subjectsResp.status == "success") {
                     subjects = subjectsResp.data
+                    pyqSubjectsCache = subjectsResp.data
                 }
 
                 val examsResp = RetrofitClient.apiService.getExams()
                 if (examsResp.status == "success") {
                     exams = examsResp.data
+                    pyqExamsCache = examsResp.data
                 }
 
                 val yearsResp = RetrofitClient.apiService.getYears()
                 if (yearsResp.status == "success") {
                     years = yearsResp.data
+                    pyqYearsCache = yearsResp.data
                 }
             }
             errorMessage = null
         } catch (e: Exception) {
-            errorMessage = e.message
+            if (pyqSubjectsCache == null) errorMessage = e.message
             isConnected = false
         } finally {
             isLoading = false
@@ -233,25 +267,27 @@ fun PYQBankScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF1F5F9))
+            .background(MaterialTheme.colorScheme.background)
             .testTag("pyq_bank_screen")
     ) {
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Subject-wise / Exam-wise / Year-wise Toggle Tabs (3 Tabs)
+        // Subject-wise / Exam-wise / Year-wise Toggle Tabs (3 Tabs synced with HorizontalPager)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            // Subject-wise tab
+            // Subject-wise tab (Page 0)
             Button(
-                onClick = { viewMode = PYQViewMode.SUBJECT_WISE },
-                modifier = Modifier.weight(1f),
+                onClick = {
+                    coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp)),
                 shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (viewMode == PYQViewMode.SUBJECT_WISE) TestbookNavy else Color.White
+                    containerColor = if (pagerState.currentPage == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                 ),
                 contentPadding = PaddingValues(vertical = 12.dp)
             ) {
@@ -259,19 +295,21 @@ fun PYQBankScreen(
                     text = "विषयवार",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (viewMode == PYQViewMode.SUBJECT_WISE) Color.White else Color(0xFF475569)
+                    color = if (pagerState.currentPage == 0) Color.White else MaterialTheme.colorScheme.onSurface
                 )
             }
 
-            // Exam-wise tab
+            // Exam-wise tab (Page 1)
             Button(
-                onClick = { viewMode = PYQViewMode.EXAM_WISE },
+                onClick = {
+                    coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                },
                 modifier = Modifier
                     .weight(1f)
-                    .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(0.dp)),
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(0.dp)),
                 shape = RoundedCornerShape(0.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (viewMode == PYQViewMode.EXAM_WISE) TestbookNavy else Color.White
+                    containerColor = if (pagerState.currentPage == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                 ),
                 contentPadding = PaddingValues(vertical = 12.dp)
             ) {
@@ -279,19 +317,21 @@ fun PYQBankScreen(
                     text = "परीक्षावार",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (viewMode == PYQViewMode.EXAM_WISE) Color.White else Color(0xFF475569)
+                    color = if (pagerState.currentPage == 1) Color.White else MaterialTheme.colorScheme.onSurface
                 )
             }
 
-            // Year-wise tab
+            // Year-wise tab (Page 2)
             Button(
-                onClick = { viewMode = PYQViewMode.YEAR_WISE },
+                onClick = {
+                    coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                },
                 modifier = Modifier
                     .weight(1f)
-                    .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)),
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f), RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)),
                 shape = RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (viewMode == PYQViewMode.YEAR_WISE) TestbookNavy else Color.White
+                    containerColor = if (pagerState.currentPage == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                 ),
                 contentPadding = PaddingValues(vertical = 12.dp)
             ) {
@@ -299,29 +339,16 @@ fun PYQBankScreen(
                     text = "वर्षवार",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (viewMode == PYQViewMode.YEAR_WISE) Color.White else Color(0xFF475569)
+                    color = if (pagerState.currentPage == 2) Color.White else MaterialTheme.colorScheme.onSurface
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Content Area
+        // Content Area with Shimmer Skeleton Loading & Swipeable HorizontalPager
         if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = TestbookNavy)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Fetching from TiDB Cloud...",
-                        fontSize = 13.sp,
-                        color = Color(0xFF64748B)
-                    )
-                }
-            }
+            ShimmerLoadingGrid()
         } else if (errorMessage != null) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -343,78 +370,104 @@ fun PYQBankScreen(
                 }
             }
         } else {
-            when (viewMode) {
-                PYQViewMode.SUBJECT_WISE -> {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(bottom = 16.dp)
-                    ) {
-                        itemsIndexed(subjects) { index, subject ->
-                            SubjectExamCard(
-                                number = String.format("%02d", index + 1),
-                                titleMr = subject.nameMr,
-                                titleEn = subject.nameEn,
-                                pyqCount = subject.pyqCount,
-                                onClick = {
-                                    selectedSubjectId = subject.id.toIntOrNull() ?: 0
-                                    selectedSubjectName = subject.nameMr.ifEmpty { subject.nameEn }
-                                }
-                            )
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> { // Subject-wise View
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 16.dp)
+                        ) {
+                            itemsIndexed(subjects) { index, subject ->
+                                SubjectExamCard(
+                                    number = String.format("%02d", index + 1),
+                                    titleMr = subject.nameMr,
+                                    titleEn = subject.nameEn,
+                                    pyqCount = subject.pyqCount,
+                                    onClick = {
+                                        selectedSubjectId = subject.id.toIntOrNull() ?: 0
+                                        selectedSubjectName = subject.nameMr.ifEmpty { subject.nameEn }
+                                    }
+                                )
+                            }
                         }
                     }
-                }
 
-                PYQViewMode.EXAM_WISE -> {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(bottom = 16.dp)
-                    ) {
-                        itemsIndexed(exams) { index, examCategory ->
-                            SubjectExamCard(
-                                number = String.format("%02d", index + 1),
-                                titleMr = examCategory.categoryName,
-                                titleEn = "${examCategory.yearCount} Years",
-                                pyqCount = "${examCategory.pyqCount}",
-                                onClick = {
-                                    selectedExamCategory = examCategory.categoryName
-                                    selectedExamCategoryPyqs = examCategory.pyqCount
+                    1 -> { // Exam-wise View
+                        val majorSections = remember(exams) {
+                            val majors = exams.filter { it.parentId == 0 || it.id in 1..3 }
+                            val minorsMap = exams.filter { it.parentId > 0 }.groupBy { it.parentId }
+                            
+                            majors.map { major ->
+                                val minors = minorsMap[major.id] ?: emptyList()
+                                Pair(major, minors)
+                            }
+                        }
+
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 16.dp)
+                        ) {
+                            var majorCounter = 1
+                            var subCounter = 1
+
+                            majorSections.forEach { (majorExam, subExams) ->
+                                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
+                                    GrayStripHeader(title = majorExam.categoryName)
                                 }
-                            )
+
+                                val allSectionCards = listOf(majorExam) + subExams
+                                itemsIndexed(allSectionCards) { _, examCategory ->
+                                    val isMajor = examCategory.parentId == 0
+                                    SubjectExamCard(
+                                        number = String.format("%02d", subCounter++),
+                                        titleMr = examCategory.categoryName,
+                                        titleEn = "${examCategory.yearCount} Years",
+                                        pyqCount = "${examCategory.pyqCount}",
+                                        onClick = {
+                                            selectedExamCategory = examCategory.categoryName
+                                            selectedExamCategoryPyqs = examCategory.pyqCount
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
-                }
 
-                PYQViewMode.YEAR_WISE -> {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(bottom = 16.dp)
-                    ) {
-                        itemsIndexed(years) { index, yearCategory ->
-                            SubjectExamCard(
-                                number = String.format("%02d", index + 1),
-                                titleMr = "वर्ष ${yearCategory.year}",
-                                titleEn = "${yearCategory.examCount} Exams",
-                                pyqCount = "${yearCategory.pyqCount}",
-                                onClick = {
-                                    selectedYearCategory = yearCategory.year
-                                    selectedYearCategoryPyqs = yearCategory.pyqCount
-                                }
-                            )
+                    2 -> { // Year-wise View
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 16.dp)
+                        ) {
+                            itemsIndexed(years) { index, yearCategory ->
+                                SubjectExamCard(
+                                    number = String.format("%02d", index + 1),
+                                    titleMr = "वर्ष ${yearCategory.year}",
+                                    titleEn = "${yearCategory.examCount} Exams",
+                                    pyqCount = "${yearCategory.pyqCount}",
+                                    onClick = {
+                                        selectedYearCategory = yearCategory.year
+                                        selectedYearCategoryPyqs = yearCategory.pyqCount
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -422,6 +475,27 @@ fun PYQBankScreen(
         }
     }
         }
+    }
+}
+
+@Composable
+fun GrayStripHeader(
+    title: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 2.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 
@@ -438,80 +512,72 @@ fun SubjectExamCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(horizontal = 10.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Number
+            // Left Number Badge (01, 02...)
             Text(
                 text = number,
-                fontSize = 20.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF94A3B8)
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-            // Vertical divider
+            // Thin Vertical Divider Line
             Box(
                 modifier = Modifier
-                    .width(2.dp)
-                    .height(40.dp)
-                    .background(Color(0xFFE2E8F0))
+                    .width(1.dp)
+                    .height(32.dp)
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
             )
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-            // Title and PYQ count
+            // Title and Question count
             Column(modifier = Modifier.weight(1f)) {
-                if (titleEn.isNotEmpty()) {
+                Text(
+                    text = titleMr,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp
+                )
+
+                if (pyqCount.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "$titleMr ($titleEn)",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1E293B),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 17.sp
-                    )
-                } else {
-                    Text(
-                        text = titleMr,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1E293B),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 17.sp
+                        text = if (pyqCount.endsWith("Qs") || pyqCount.contains("प्रश्न")) pyqCount else "$pyqCount Qs",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.secondary
                     )
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "$pyqCount प्रश्न (PYQs)",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TestbookEmerald
-                )
             }
         }
     }
 }
 
-// PYQCardItem - Used by BookmarksScreen to display individual question cards
+// PYQCardItem - Used by BookmarksScreen & PYQBankScreen to display individual question cards
 @Composable
 fun PYQCardItem(
     question: QuestionEntity,
     languageMode: LanguageMode,
     isStudyMode: Boolean,
     onToggleBookmark: () -> Unit,
+    showSubjectTag: Boolean = true,
+    onReportClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isSolutionExpanded by remember { mutableStateOf(isStudyMode) }
@@ -522,7 +588,8 @@ fun PYQCardItem(
             .fillMaxWidth()
             .testTag("pyq_card_${question.id}"),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -534,7 +601,8 @@ fun PYQCardItem(
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
@@ -549,17 +617,19 @@ fun PYQCardItem(
                         )
                     }
 
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = TestbookGold.copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text = question.subject,
-                            color = Color(0xFFB45309),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
+                    if (showSubjectTag) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = TestbookGold.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = question.subject,
+                                color = Color(0xFFB45309),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
                     }
                 }
 
@@ -579,51 +649,64 @@ fun PYQCardItem(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Question Text
+            // Question Text (Strictly in active languageMode)
+            val qMrClean = question.questionMarathi.cleanHtml()
+            val qEnClean = question.questionEnglish.cleanHtml()
+
+            val questionText = if (languageMode == LanguageMode.MARATHI) {
+                qMrClean.ifEmpty { qEnClean }
+            } else {
+                qEnClean.ifEmpty { qMrClean }
+            }
+
             Text(
-                text = if (languageMode == LanguageMode.MARATHI) "प्र. ${question.id}. ${question.questionMarathi}" else "Q${question.id}. ${question.questionEnglish}",
+                text = if (languageMode == LanguageMode.MARATHI) "प्र. ${question.id}. $questionText" else "Q${question.id}. $questionText",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF0F172A),
+                color = MaterialTheme.colorScheme.onSurface,
                 lineHeight = 20.sp
             )
-
-            if (languageMode == LanguageMode.MARATHI && question.questionEnglish.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = question.questionEnglish,
-                    fontSize = 12.sp,
-                    color = Color(0xFF64748B),
-                    lineHeight = 16.sp
-                )
-            }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             // Options 1 to 4
             val optionsList = listOf(
-                1 to (if (languageMode == LanguageMode.MARATHI) question.option1Marathi else question.option1English),
-                2 to (if (languageMode == LanguageMode.MARATHI) question.option2Marathi else question.option2English),
-                3 to (if (languageMode == LanguageMode.MARATHI) question.option3Marathi else question.option3English),
-                4 to (if (languageMode == LanguageMode.MARATHI) question.option4Marathi else question.option4English)
+                1 to (if (languageMode == LanguageMode.MARATHI) question.option1Marathi else question.option1English).cleanHtml(),
+                2 to (if (languageMode == LanguageMode.MARATHI) question.option2Marathi else question.option2English).cleanHtml(),
+                3 to (if (languageMode == LanguageMode.MARATHI) question.option3Marathi else question.option3English).cleanHtml(),
+                4 to (if (languageMode == LanguageMode.MARATHI) question.option4Marathi else question.option4English).cleanHtml()
             )
 
-            optionsList.forEach { (num, text) ->
+            optionsList.forEach { optionPair ->
+                val num = optionPair.first
+                val text = optionPair.second
                 val isCorrect = (num == question.correctOption)
                 val isSelected = (num == selectedOptionByUser)
 
                 val optionBg = when {
-                    isSolutionExpanded && isCorrect -> Color(0xFFDCFCE7)
-                    isSelected && !isCorrect && isSolutionExpanded -> Color(0xFFFEE2E2)
-                    isSelected -> TestbookNavy.copy(alpha = 0.1f)
-                    else -> Color(0xFFF8FAFC)
+                    isSolutionExpanded && isCorrect -> Color(0xFF059669).copy(alpha = 0.2f)
+                    isSelected && !isCorrect && isSolutionExpanded -> Color(0xFFDC2626).copy(alpha = 0.2f)
+                    isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    else -> MaterialTheme.colorScheme.surfaceVariant
                 }
 
                 val optionBorder = when {
                     isSolutionExpanded && isCorrect -> TestbookEmerald
                     isSelected && !isCorrect && isSolutionExpanded -> Color(0xFFEF4444)
-                    isSelected -> TestbookNavy
-                    else -> Color(0xFFE2E8F0)
+                    isSelected -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                }
+
+                val tickBoxBg = when {
+                    isSolutionExpanded && isCorrect -> TestbookEmerald
+                    isSelected && !isCorrect && isSolutionExpanded -> Color(0xFFDC2626)
+                    isSelected -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.surface
+                }
+
+                val tickBoxTextColor = when {
+                    isSolutionExpanded && isCorrect || isSelected -> Color.White
+                    else -> MaterialTheme.colorScheme.onSurface
                 }
 
                 Surface(
@@ -646,7 +729,7 @@ fun PYQCardItem(
                             modifier = Modifier
                                 .size(22.dp)
                                 .background(
-                                    if (isSolutionExpanded && isCorrect) TestbookEmerald else Color.White,
+                                    tickBoxBg,
                                     shape = RoundedCornerShape(4.dp)
                                 ),
                             contentAlignment = Alignment.Center
@@ -655,7 +738,7 @@ fun PYQCardItem(
                                 text = "($num)",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isSolutionExpanded && isCorrect) Color.White else Color(0xFF334155)
+                                color = tickBoxTextColor
                             )
                         }
 
@@ -664,7 +747,7 @@ fun PYQCardItem(
                         Text(
                             text = text,
                             fontSize = 12.sp,
-                            color = Color(0xFF1E293B),
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f)
                         )
 
@@ -715,15 +798,15 @@ fun PYQCardItem(
                 Spacer(modifier = Modifier.height(10.dp))
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFFEFF6FF),
-                    border = BorderStroke(1.dp, Color(0xFFBFDBFE))
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.Lightbulb,
                                 contentDescription = "Tip",
-                                tint = TestbookNavy,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
@@ -731,25 +814,225 @@ fun PYQCardItem(
                                 text = "योग्य उत्तर: पर्याय (${question.correctOption})",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp,
-                                color = TestbookNavy
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = if (languageMode == LanguageMode.MARATHI) question.explanationMarathi else question.explanationEnglish,
-                            fontSize = 11.sp,
-                            color = Color(0xFF1E293B),
-                            lineHeight = 16.sp
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 18.sp
                         )
                         if (question.tags.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "संदर्भ/टॅग्स: ${question.tags}",
                                 fontSize = 10.sp,
-                                color = Color(0xFF64748B),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuestionReportDialog(
+    questionId: Int,
+    onDismiss: () -> Unit,
+    onSubmit: (reportType: String, comment: String) -> Unit
+) {
+    val reportTypes = listOf(
+        "Question is Wrong (प्रश्न किंवा उत्तर चुकीचे आहे)",
+        "Options Error (पर्यायांमध्ये चूक आहे)",
+        "Spelling / Language Error (भाषांतर / स्पेलिंग चूक)",
+        "General Feedback (अभिप्राय / फीडबॅक)"
+    )
+    var selectedType by remember { mutableStateOf(reportTypes[0]) }
+    var isDropdownExpanded by remember { mutableStateOf(false) }
+    var commentText by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "प्रश्न रिपोर्ट करा (Report Q#$questionId)",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "समस्या प्रकार निवडा (Choose Issue Type):",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Surface(
+                        onClick = { isDropdownExpanded = true },
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = selectedType,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Dropdown"
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = isDropdownExpanded,
+                        onDismissRequest = { isDropdownExpanded = false },
+                        modifier = Modifier.fillMaxWidth(0.85f)
+                    ) {
+                        reportTypes.forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(text = type, fontSize = 12.sp) },
+                                onClick = {
+                                    selectedType = type
+                                    isDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "स्पष्टीकरण किंवा मत लिहा (Write Details):",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                OutlinedTextField(
+                    value = commentText,
+                    onValueChange = { commentText = it },
+                    placeholder = { Text("उदा. पर्याय २ बरोबर आहे किंवा स्पेलिंग चूक आहे...", fontSize = 12.sp) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    maxLines = 4
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (commentText.isNotBlank()) {
+                        onSubmit(selectedType, commentText)
+                    }
+                },
+                enabled = commentText.isNotBlank()
+            ) {
+                Text("सबमिट करा (Submit)")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("रद्द करा (Cancel)")
+            }
+        }
+    )
+}
+
+@Composable
+fun ShimmerLoadingGrid() {
+    val transition = rememberInfiniteTransition(label = "shimmerTransition")
+    val alphaAnim by transition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 850, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmerAlpha"
+    )
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 16.dp)
+    ) {
+        items(8) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(105.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alphaAnim * 0.10f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+            ) {
+                Box(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+                    Column {
+                        Box(
+                            modifier = Modifier
+                                .width(36.dp)
+                                .height(16.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alphaAnim * 0.25f))
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.85f)
+                                .height(14.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alphaAnim * 0.35f))
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.5f)
+                                .height(12.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = alphaAnim * 0.20f))
+                        )
                     }
                 }
             }

@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,20 +14,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,9 +43,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.remote.ApiYearExam
 import com.example.data.remote.RetrofitClient
-import com.example.ui.components.TopHeaderBar
-import com.example.ui.theme.TestbookEmerald
-import com.example.ui.theme.TestbookNavy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -82,7 +78,7 @@ fun YearExamListScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF1F5F9))
+            .background(MaterialTheme.colorScheme.background)
     ) {
 
         if (isLoading) {
@@ -91,9 +87,9 @@ fun YearExamListScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = TestbookNavy)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Loading exams for $yearLabel...", fontSize = 13.sp, color = Color(0xFF64748B))
+                    Text("Loading exams for $yearLabel...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else if (errorMessage != null) {
@@ -117,7 +113,8 @@ fun YearExamListScreen(
                                 onExamSelected(exam.rawExamName, exam.rawExamName)
                             },
                         shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
                         Row(
@@ -128,14 +125,14 @@ fun YearExamListScreen(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = TestbookNavy.copy(alpha = 0.08f)
+                                color = MaterialTheme.colorScheme.surfaceVariant
                             ) {
                                 Text(
                                     text = String.format("%02d", index + 1),
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TestbookNavy
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
 
@@ -146,7 +143,7 @@ fun YearExamListScreen(
                                     text = exam.rawExamName,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF1E293B),
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -155,7 +152,7 @@ fun YearExamListScreen(
                                     Icon(
                                         imageVector = Icons.Default.Assignment,
                                         contentDescription = null,
-                                        tint = TestbookEmerald,
+                                        tint = MaterialTheme.colorScheme.secondary,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -163,7 +160,7 @@ fun YearExamListScreen(
                                         text = "${exam.pyqCount} प्रश्न (PYQs)",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = TestbookEmerald
+                                        color = MaterialTheme.colorScheme.secondary
                                     )
                                 }
                             }
@@ -171,7 +168,7 @@ fun YearExamListScreen(
                             Icon(
                                 imageVector = Icons.Default.ChevronRight,
                                 contentDescription = "Open",
-                                tint = Color(0xFF94A3B8),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
                         }

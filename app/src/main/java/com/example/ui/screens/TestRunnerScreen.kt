@@ -1,14 +1,16 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,12 +20,23 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.NavigateBefore
 import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.material.icons.filled.Timer
@@ -32,27 +45,36 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.example.ui.components.ConfettiCelebrationOverlay
 import com.example.ui.theme.TestbookEmerald
 import com.example.ui.theme.TestbookGold
 import com.example.ui.theme.TestbookNavy
@@ -60,8 +82,8 @@ import com.example.ui.theme.TestbookOrange
 import com.example.ui.viewmodel.LanguageMode
 import com.example.ui.viewmodel.QuestionState
 import com.example.ui.viewmodel.TestActiveState
+import com.example.utils.cleanHtml
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TestRunnerScreen(
     state: TestActiveState,
@@ -81,495 +103,520 @@ fun TestRunnerScreen(
     val currentQ = state.questions.getOrNull(state.currentIndex) ?: return
     val selectedOption = state.userAnswers[currentQ.id]
 
+    val coroutineScope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(pageCount = { state.questions.size })
+
+    LaunchedEffect(pagerState.currentPage) {
+        if (state.questions.isNotEmpty() && pagerState.currentPage in state.questions.indices && pagerState.currentPage != state.currentIndex) {
+            onJumpToQuestion(pagerState.currentPage)
+        }
+    }
+
+    LaunchedEffect(state.currentIndex) {
+        if (state.questions.isNotEmpty() && state.currentIndex in state.questions.indices && pagerState.currentPage != state.currentIndex) {
+            pagerState.scrollToPage(state.currentIndex)
+        }
+    }
+
     val mins = state.timeRemainingSeconds / 60
     val secs = state.timeRemainingSeconds % 60
     val timerStr = String.format("%02d:%02d", mins, secs)
     val isTimeLow = state.timeRemainingSeconds < 120
 
-    Scaffold(
-        topBar = {
-            Surface(
-                color = TestbookNavy,
-                shadowElevation = 4.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = onExitTest,
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .testTag("exit_test_btn")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Exit",
-                                    tint = Color.White
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = state.testPaper.title,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                modifier = Modifier.width(160.dp)
-                            )
+    var totalDragAmount by remember { mutableFloatStateOf(0f) }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(state.currentIndex, state.questions.size) {
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { _, dragAmount ->
+                        totalDragAmount += dragAmount
+                    },
+                    onDragEnd = {
+                        if (totalDragAmount < -70f && state.currentIndex < state.questions.size - 1) {
+                            onNextQuestion()
+                        } else if (totalDragAmount > 70f && state.currentIndex > 0) {
+                            onPreviousQuestion()
                         }
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Timer Pill
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = if (isTimeLow) Color(0xFFEF4444) else Color(0xFF1E293B)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Timer,
-                                        contentDescription = "Timer",
-                                        tint = if (isTimeLow) Color.White else TestbookGold,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = timerStr,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            // Lang Toggle
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = TestbookEmerald,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .clickable { onToggleLanguage() }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Language,
-                                        contentDescription = "Lang",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = if (state.languageMode == LanguageMode.MARATHI) "मराठी" else "ENG",
-                                        color = Color.White,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            // Question Palette Trigger Icon
-                            IconButton(
-                                onClick = { onTogglePalette(true) },
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .testTag("open_palette_btn")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.GridOn,
-                                    contentDescription = "Palette",
-                                    tint = TestbookGold
-                                )
-                            }
-                        }
-                    }
-                }
+                        totalDragAmount = 0f
+                    },
+                    onDragCancel = { totalDragAmount = 0f }
+                )
             }
-        },
-        bottomBar = {
-            Surface(
-                color = Color.White,
-                shadowElevation = 8.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedButton(
-                            onClick = onClearOption,
-                            shape = RoundedCornerShape(8.dp),
-                            enabled = (selectedOption != null),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.testTag("clear_response_btn")
-                        ) {
-                            Text(
-                                text = if (state.languageMode == LanguageMode.MARATHI) "Clear" else "Clear",
-                                fontSize = 11.sp,
-                                color = Color(0xFF64748B)
-                            )
-                        }
-
-                        Button(
-                            onClick = onMarkForReview,
-                            colors = ButtonDefaults.buttonColors(containerColor = TestbookOrange),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.testTag("mark_review_btn")
-                        ) {
-                            Text(
-                                text = if (state.languageMode == LanguageMode.MARATHI) "Mark for Review" else "Mark for Review",
-                                fontSize = 11.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                onNextQuestion()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = TestbookEmerald),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.testTag("save_next_btn")
-                        ) {
-                            Text(
-                                text = if (state.languageMode == LanguageMode.MARATHI) "Save & Next" else "Save & Next",
-                                fontSize = 11.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row {
-                            OutlinedButton(
-                                onClick = onPreviousQuestion,
-                                enabled = (state.currentIndex > 0),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                modifier = Modifier.testTag("prev_q_btn")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.NavigateBefore,
-                                    contentDescription = "Prev",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text("Prev", fontSize = 11.sp)
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            OutlinedButton(
-                                onClick = onNextQuestion,
-                                enabled = (state.currentIndex + 1 < state.questions.size),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                modifier = Modifier.testTag("next_q_btn")
-                            ) {
-                                Text("Next", fontSize = 11.sp)
-                                Icon(
-                                    imageVector = Icons.Default.NavigateNext,
-                                    contentDescription = "Next",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = { onToggleSubmitDialog(true) },
-                            colors = ButtonDefaults.buttonColors(containerColor = TestbookNavy),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                            modifier = Modifier.testTag("submit_test_btn")
-                        ) {
-                            Text(
-                                text = if (state.languageMode == LanguageMode.MARATHI) "जमा करा (Submit)" else "Submit Test",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .background(Color(0xFFF1F5F9))
-                .padding(16.dp)
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            // Question Header Line
-            Row(
+            // TOP CONTROL HEADER BAR (Matching PYQ Style)
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 2.dp
             ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = TestbookNavy
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Q.${state.currentIndex + 1} of ${state.questions.size}",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
+                    // Question Counter Box
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = TestbookGold.copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text = currentQ.subject,
-                        color = Color(0xFFB45309),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Question Box
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = if (state.languageMode == LanguageMode.MARATHI) currentQ.questionMarathi else currentQ.questionEnglish,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
-                        lineHeight = 22.sp
-                    )
-
-                    if (state.languageMode == LanguageMode.MARATHI && currentQ.questionEnglish.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = currentQ.questionEnglish,
-                            fontSize = 12.sp,
-                            color = Color(0xFF64748B),
-                            lineHeight = 17.sp
-                        )
+                        // Counter Card (e.g., 03 / 100)
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(4.dp)
+                                        .height(34.dp)
+                                        .background(Color(0xFFEA580C), shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
+                                )
+                                Text(
+                                    text = String.format("%02d / %d", state.currentIndex + 1, state.questions.size),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    val optionsList = listOf(
-                        1 to (if (state.languageMode == LanguageMode.MARATHI) currentQ.option1Marathi else currentQ.option1English),
-                        2 to (if (state.languageMode == LanguageMode.MARATHI) currentQ.option2Marathi else currentQ.option2English),
-                        3 to (if (state.languageMode == LanguageMode.MARATHI) currentQ.option3Marathi else currentQ.option3English),
-                        4 to (if (state.languageMode == LanguageMode.MARATHI) currentQ.option4Marathi else currentQ.option4English)
-                    )
-
-                    optionsList.forEach { (num, optionText) ->
-                        val isSelected = (selectedOption == num)
-
+                    // Timer | Language | Square Dots Grid
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Timer Pill
                         Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable { onSelectOption(num) }
-                                .testTag("option_${num}_btn"),
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) TestbookNavy.copy(alpha = 0.08f) else Color(0xFFF8FAFC),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.5.dp,
-                                if (isSelected) TestbookNavy else Color(0xFFE2E8F0)
-                            )
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isTimeLow) Color(0xFF7F1D1D) else MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, if (isTimeLow) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
                         ) {
                             Row(
-                                modifier = Modifier.padding(12.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = { onSelectOption(num) },
-                                    colors = RadioButtonDefaults.colors(selectedColor = TestbookNavy)
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = "Timer",
+                                    tint = if (isTimeLow) Color(0xFFF87171) else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(14.dp)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "($num) $optionText",
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) TestbookNavy else Color(0xFF1E293B)
+                                    text = timerStr,
+                                    color = if (isTimeLow) Color(0xFFF87171) else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+
+                        // Lang Toggle
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onToggleLanguage() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = "Lang",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (state.languageMode == LanguageMode.MARATHI) "मराठी" else "ENG",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Square Dots Icon (Question Palette Modal)
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFFAFAFA),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            modifier = Modifier.size(34.dp).clickable { onTogglePalette(true) }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.GridView,
+                                    contentDescription = "Question Palette",
+                                    tint = TestbookNavy,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
                     }
                 }
             }
-        }
-    }
 
-    // Question Palette Bottom Sheet
-    if (state.isPaletteOpen) {
-        ModalBottomSheet(
-            onDismissRequest = { onTogglePalette(false) },
-            sheetState = rememberModalBottomSheetState(),
-            containerColor = Color.White
-        ) {
-            Column(
+            // Progress Indicator
+            LinearProgressIndicator(
+                progress = { (state.currentIndex + 1).toFloat() / state.questions.size },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
-            ) {
-                Text(
-                    text = if (state.languageMode == LanguageMode.MARATHI) "प्रश्न सूची (Question Palette)" else "Question Palette Grid",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = TestbookNavy
-                )
+                    .height(3.dp),
+                color = TestbookEmerald,
+                trackColor = Color(0xFFE2E8F0)
+            )
 
-                Spacer(modifier = Modifier.height(12.dp))
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) { pageIndex ->
+                val qPage = state.questions.getOrNull(pageIndex) ?: return@HorizontalPager
+                val selOption = state.userAnswers[qPage.id]
 
-                // Legend
-                Row(
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp)
+                ) {
+                // QUESTION CONTAINER CARD
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                 ) {
-                    LegendItem("Answered", TestbookEmerald)
-                    LegendItem("Marked", TestbookOrange)
-                    LegendItem("Ans & Marked", Color(0xFF8B5CF6))
-                    LegendItem("Unattempted", Color(0xFFCBD5E1))
-                }
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFF59E0B).copy(alpha = 0.18f),
+                                border = BorderStroke(1.dp, Color(0xFFFBBF24).copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = currentQ.subject,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFBBF24),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(5),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(state.questions.size) { index ->
-                        val q = state.questions[index]
-                        val qState = state.questionStates[q.id] ?: QuestionState.UNATTEMPTED
-
-                        val itemBg = when (qState) {
-                            QuestionState.ANSWERED -> TestbookEmerald
-                            QuestionState.MARKED_FOR_REVIEW -> TestbookOrange
-                            QuestionState.ANSWERED_AND_MARKED -> Color(0xFF8B5CF6)
-                            QuestionState.UNATTEMPTED -> Color(0xFFE2E8F0)
+                            Text(
+                                text = (currentQ.examType).uppercase(),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFEA580C)
+                            )
                         }
 
-                        val textColor = if (qState == QuestionState.UNATTEMPTED) Color(0xFF334155) else Color.White
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(itemBg)
-                                .border(
-                                    2.dp,
-                                    if (index == state.currentIndex) TestbookNavy else Color.Transparent,
-                                    CircleShape
-                                )
-                                .clickable { onJumpToQuestion(index) },
-                            contentAlignment = Alignment.Center
+                        val qMrClean = currentQ.questionMarathi.cleanHtml()
+                        val qEnClean = currentQ.questionEnglish.cleanHtml()
+
+                        val qText = if (state.languageMode == LanguageMode.MARATHI) {
+                            "प्रश्न : ${qMrClean.ifEmpty { qEnClean }}"
+                        } else {
+                            "Q : ${qEnClean.ifEmpty { qMrClean }}"
+                        }
+
+                        Text(
+                            text = qText,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            lineHeight = 23.sp
+                        )
+
+                        if (state.languageMode == LanguageMode.MARATHI && qEnClean.isNotEmpty() && !qEnClean.equals(qMrClean, ignoreCase = true)) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = qEnClean,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                lineHeight = 20.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // OPTIONS LIST (Stripped of HTML tags)
+                val opt1 = (if (state.languageMode == LanguageMode.MARATHI) currentQ.option1Marathi.ifEmpty { currentQ.option1English } else currentQ.option1English.ifEmpty { currentQ.option1Marathi }).cleanHtml()
+                val opt2 = (if (state.languageMode == LanguageMode.MARATHI) currentQ.option2Marathi.ifEmpty { currentQ.option2English } else currentQ.option2English.ifEmpty { currentQ.option2Marathi }).cleanHtml()
+                val opt3 = (if (state.languageMode == LanguageMode.MARATHI) currentQ.option3Marathi.ifEmpty { currentQ.option3English } else currentQ.option3English.ifEmpty { currentQ.option3Marathi }).cleanHtml()
+                val opt4 = (if (state.languageMode == LanguageMode.MARATHI) currentQ.option4Marathi.ifEmpty { currentQ.option4English } else currentQ.option4English.ifEmpty { currentQ.option4Marathi }).cleanHtml()
+
+                val optionsList = listOf(
+                    1 to opt1,
+                    2 to opt2,
+                    3 to opt3,
+                    4 to opt4
+                )
+
+                optionsList.forEach { (num, optionText) ->
+                    val isSelected = (selectedOption == num)
+                    val isCorrect = (num == currentQ.correctOption)
+
+                    val bg = when {
+                        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        else -> MaterialTheme.colorScheme.surface
+                    }
+                    val borderColor = when {
+                        isSelected -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable {
+                                onSelectOption(num)
+                            },
+                        shape = RoundedCornerShape(10.dp),
+                        color = bg,
+                        border = BorderStroke(1.dp, borderColor)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "${index + 1}",
-                                color = textColor,
+                                text = "$num) $optionText",
+                                fontSize = 14.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                                lineHeight = 20.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(80.dp)) // Space for bottom bar
+            }
+        }
+
+        // STICKY BOTTOM NAVIGATION BAR
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 8.dp
+        ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Previous Button (Icon Only: Left Arrow)
+                    IconButton(
+                        onClick = {
+                            onPreviousQuestion()
+                            if (state.currentIndex > 0) {
+                                coroutineScope.launch { pagerState.animateScrollToPage(state.currentIndex - 1) }
+                            }
+                        },
+                        enabled = (state.currentIndex > 0),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Previous",
+                            modifier = Modifier.size(22.dp),
+                            tint = if (state.currentIndex > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        )
+                    }
+
+                    // Action Controls: Submit Only
+                    Button(
+                        onClick = { onToggleSubmitDialog(true) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text("Submit Test", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    // Save & Next Button (Bottom Right Corner)
+                    Button(
+                        onClick = {
+                            onNextQuestion()
+                            if (state.currentIndex + 1 < state.questions.size) {
+                                coroutineScope.launch { pagerState.animateScrollToPage(state.currentIndex + 1) }
+                            }
+                        },
+                        enabled = (state.currentIndex + 1 < state.questions.size),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = Color.White
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (state.languageMode == LanguageMode.MARATHI) "जतन करा व पुढे" else "Save & Next",
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Icon(
+                                Icons.Default.NavigateNext,
+                                contentDescription = "Next",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
                 }
             }
         }
-    }
 
-    // Submit Confirmation Dialog
-    if (state.isSubmitDialogOpen) {
-        val attemptedCount = state.questionStates.values.count { it == QuestionState.ANSWERED || it == QuestionState.ANSWERED_AND_MARKED }
-        val markedCount = state.questionStates.values.count { it == QuestionState.MARKED_FOR_REVIEW || it == QuestionState.ANSWERED_AND_MARKED }
-        val unattemptedCount = state.questions.size - attemptedCount
-
-        AlertDialog(
-            onDismissRequest = { onToggleSubmitDialog(false) },
-            title = {
-                Text(
-                    text = if (state.languageMode == LanguageMode.MARATHI) "टेस्ट जमा करण्याची खात्री आहे?" else "Submit Test Confirmation",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column {
-                    Text(text = "एकूण प्रश्न: ${state.questions.size}", fontSize = 13.sp)
-                    Text(text = "सोडवलेले प्रश्न (Attempted): $attemptedCount", fontSize = 13.sp, color = TestbookEmerald, fontWeight = FontWeight.Bold)
-                    Text(text = "न सोडवलेले प्रश्न (Unattempted): $unattemptedCount", fontSize = 13.sp, color = Color(0xFFEF4444))
-                    Text(text = "पुनरावलोकनासाठी ठेवलेले (Marked): $markedCount", fontSize = 13.sp, color = TestbookOrange)
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = onSubmitTest,
-                    colors = ButtonDefaults.buttonColors(containerColor = TestbookEmerald),
-                    modifier = Modifier.testTag("confirm_submit_btn")
+        // QUESTION PALETTE MODAL DIALOG (SQUARE DOTS GRID)
+        if (state.isPaletteOpen) {
+            Dialog(
+                onDismissRequest = { onTogglePalette(false) },
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .fillMaxHeight(0.75f),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 12.dp
                 ) {
-                    Text(text = "जमा करा (Confirm Submit)", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onToggleSubmitDialog(false) }) {
-                    Text(text = "रद्द करा (Cancel)")
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "प्रश्न पॅलेट (Question Palette)",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "एकूण ${state.questions.size} प्रश्न (Click square to jump)",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(onClick = { onTogglePalette(false) }) {
+                                Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // 5-Column Grid
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(5),
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(bottom = 12.dp)
+                        ) {
+                            itemsIndexed(state.questions) { idx, q ->
+                                val isAnswered = state.userAnswers.containsKey(q.id)
+                                val isCurrent = idx == state.currentIndex
+
+                                val boxBg = when {
+                                    isCurrent -> Color(0xFF2563EB).copy(alpha = 0.25f)
+                                    isAnswered -> Color(0xFF059669).copy(alpha = 0.25f)
+                                    else -> MaterialTheme.colorScheme.surfaceVariant
+                                }
+                                val boxBorder = when {
+                                    isCurrent -> Color(0xFF60A5FA)
+                                    isAnswered -> Color(0xFF34D399)
+                                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                                }
+
+                                Surface(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .clickable { onJumpToQuestion(idx) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = boxBg,
+                                    border = BorderStroke(1.5.dp, boxBorder)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = String.format("%02d", idx + 1),
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isCurrent || isAnswered) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isCurrent || isAnswered) Color.White else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        )
-    }
-}
+        }
 
-@Composable
-fun LegendItem(label: String, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(color)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text = label, fontSize = 9.sp, color = Color(0xFF475569))
+        // SUBMIT TEST CONFIRMATION DIALOG
+        if (state.isSubmitDialogOpen) {
+            AlertDialog(
+                onDismissRequest = { onToggleSubmitDialog(false) },
+                title = { Text("Submit Test?", fontWeight = FontWeight.Bold) },
+                text = {
+                    val answeredCount = state.userAnswers.size
+                    val remaining = state.questions.size - answeredCount
+                    Text("Answered: $answeredCount | Unattempted: $remaining\n\nAre you sure you want to submit your test?")
+                },
+                confirmButton = {
+                    Button(
+                        onClick = onSubmitTest,
+                        colors = ButtonDefaults.buttonColors(containerColor = TestbookNavy)
+                    ) {
+                        Text("Yes, Submit")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { onToggleSubmitDialog(false) }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
     }
 }

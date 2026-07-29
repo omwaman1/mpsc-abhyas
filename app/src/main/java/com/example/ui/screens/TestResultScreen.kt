@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -56,6 +58,7 @@ import com.example.ui.theme.TestbookGold
 import com.example.ui.theme.TestbookNavy
 import com.example.ui.viewmodel.LanguageMode
 import com.example.ui.viewmodel.TestResultState
+import com.example.utils.cleanHtml
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,10 +85,12 @@ fun TestResultScreen(
         }
     }
 
+    val isAppDark = MaterialTheme.colorScheme.background == com.example.ui.theme.BackgroundDark
+
     Scaffold(
         topBar = {
             Surface(
-                color = TestbookNavy,
+                color = if (isAppDark) MaterialTheme.colorScheme.surface else TestbookNavy,
                 shadowElevation = 4.dp,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -124,29 +129,29 @@ fun TestResultScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color(0xFFF1F5F9))
+                .background(MaterialTheme.colorScheme.background)
         ) {
             // Tab Switcher
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = Color.White,
-                contentColor = TestbookNavy,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = TestbookNavy
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             ) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("गुण व पृथक्करण (Overview)", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                    text = { Text("Performance Summary", fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("सविस्तर उत्तरे (Solutions)", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                    text = { Text("Solutions & Explanations", fontWeight = FontWeight.Bold) }
                 )
             }
 
@@ -160,7 +165,8 @@ fun TestResultScreen(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = TestbookNavy),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(
@@ -169,7 +175,7 @@ fun TestResultScreen(
                             ) {
                                 Text(
                                     text = resultState.testPaper.title,
-                                    color = Color(0xFF94A3B8),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 12.sp
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -188,7 +194,7 @@ fun TestResultScreen(
                                         text = " / ${attempt.totalMarks}",
                                         fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
 
@@ -210,7 +216,8 @@ fun TestResultScreen(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
@@ -218,7 +225,7 @@ fun TestResultScreen(
                                     text = "प्रश्नांचे विश्लेषण (Attempt Breakdown)",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp,
-                                    color = TestbookNavy
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -228,7 +235,7 @@ fun TestResultScreen(
                                 ) {
                                     BreakdownItem("बरोबर (Correct)", "${attempt.correctCount}", TestbookEmerald)
                                     BreakdownItem("चुकीचे (Wrong)", "${attempt.wrongCount}", Color(0xFFEF4444))
-                                    BreakdownItem("न सोडवलेले", "${attempt.unattemptedCount}", Color(0xFF64748B))
+                                    BreakdownItem("न सोडवलेले", "${attempt.unattemptedCount}", MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -237,7 +244,7 @@ fun TestResultScreen(
                     item {
                         Button(
                             onClick = { selectedTab = 1 },
-                            colors = ButtonDefaults.buttonColors(containerColor = TestbookNavy),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -266,7 +273,8 @@ fun TestResultScreen(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
@@ -279,11 +287,11 @@ fun TestResultScreen(
                                         text = "Q.${index + 1}",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
-                                        color = TestbookNavy
+                                        color = MaterialTheme.colorScheme.primary
                                     )
 
                                     val statusTag = when {
-                                        userPick == null -> "Skipped" to Color(0xFF64748B)
+                                        userPick == null -> "Skipped" to MaterialTheme.colorScheme.onSurfaceVariant
                                         isCorrect -> "Correct (+2)" to TestbookEmerald
                                         else -> "Wrong (-0.5)" to Color(0xFFEF4444)
                                     }
@@ -304,20 +312,35 @@ fun TestResultScreen(
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
+                                val qMrClean = q.questionMarathi.cleanHtml()
+                                val qEnClean = q.questionEnglish.cleanHtml()
+
+                                val mainQText = if (resultState.languageMode == LanguageMode.MARATHI) {
+                                    qMrClean.ifEmpty { qEnClean }
+                                } else {
+                                    qEnClean.ifEmpty { qMrClean }
+                                }
+
                                 Text(
-                                    text = if (resultState.languageMode == LanguageMode.MARATHI) q.questionMarathi else q.questionEnglish,
+                                    text = mainQText,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp,
-                                    color = Color(0xFF0F172A)
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    lineHeight = 19.sp
                                 )
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
+                                val o1 = (if (resultState.languageMode == LanguageMode.MARATHI) q.option1Marathi.ifEmpty { q.option1English } else q.option1English.ifEmpty { q.option1Marathi }).cleanHtml()
+                                val o2 = (if (resultState.languageMode == LanguageMode.MARATHI) q.option2Marathi.ifEmpty { q.option2English } else q.option2English.ifEmpty { q.option2Marathi }).cleanHtml()
+                                val o3 = (if (resultState.languageMode == LanguageMode.MARATHI) q.option3Marathi.ifEmpty { q.option3English } else q.option3English.ifEmpty { q.option3Marathi }).cleanHtml()
+                                val o4 = (if (resultState.languageMode == LanguageMode.MARATHI) q.option4Marathi.ifEmpty { q.option4English } else q.option4English.ifEmpty { q.option4Marathi }).cleanHtml()
+
                                 val opts = listOf(
-                                    1 to (if (resultState.languageMode == LanguageMode.MARATHI) q.option1Marathi else q.option1English),
-                                    2 to (if (resultState.languageMode == LanguageMode.MARATHI) q.option2Marathi else q.option2English),
-                                    3 to (if (resultState.languageMode == LanguageMode.MARATHI) q.option3Marathi else q.option3English),
-                                    4 to (if (resultState.languageMode == LanguageMode.MARATHI) q.option4Marathi else q.option4English)
+                                    1 to o1,
+                                    2 to o2,
+                                    3 to o3,
+                                    4 to o4
                                 )
 
                                 opts.forEach { (num, text) ->
@@ -325,9 +348,9 @@ fun TestResultScreen(
                                     val isUserPick = (num == userPick)
 
                                     val bg = when {
-                                        isCorrectOpt -> Color(0xFFDCFCE7)
-                                        isUserPick && !isCorrectOpt -> Color(0xFFFEE2E2)
-                                        else -> Color(0xFFF8FAFC)
+                                        isCorrectOpt -> Color(0xFF059669).copy(alpha = 0.2f)
+                                        isUserPick && !isCorrectOpt -> Color(0xFFDC2626).copy(alpha = 0.2f)
+                                        else -> MaterialTheme.colorScheme.surfaceVariant
                                     }
 
                                     Surface(
@@ -336,9 +359,9 @@ fun TestResultScreen(
                                             .padding(vertical = 3.dp),
                                         shape = RoundedCornerShape(8.dp),
                                         color = bg,
-                                        border = androidx.compose.foundation.BorderStroke(
+                                        border = BorderStroke(
                                             1.dp,
-                                            if (isCorrectOpt) TestbookEmerald else if (isUserPick) Color(0xFFEF4444) else Color(0xFFE2E8F0)
+                                            if (isCorrectOpt) TestbookEmerald else if (isUserPick) Color(0xFFEF4444) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                                         )
                                     ) {
                                         Row(
@@ -348,7 +371,7 @@ fun TestResultScreen(
                                             Text(
                                                 text = "($num) $text",
                                                 fontSize = 12.sp,
-                                                color = Color(0xFF1E293B),
+                                                color = MaterialTheme.colorScheme.onSurface,
                                                 modifier = Modifier.weight(1f)
                                             )
                                             if (isCorrectOpt) {
@@ -372,16 +395,19 @@ fun TestResultScreen(
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
+                                val expClean = (if (resultState.languageMode == LanguageMode.MARATHI) q.explanationMarathi.ifEmpty { q.explanationEnglish } else q.explanationEnglish.ifEmpty { q.explanationMarathi }).cleanHtml()
+
                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
-                                    color = Color(0xFFEFF6FF)
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                                 ) {
                                     Column(modifier = Modifier.padding(10.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(
                                                 imageVector = Icons.Default.Lightbulb,
                                                 contentDescription = "Explanation",
-                                                tint = TestbookNavy,
+                                                tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(14.dp)
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -389,14 +415,14 @@ fun TestResultScreen(
                                                 text = "स्पष्टीकरण (Explanation):",
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 11.sp,
-                                                color = TestbookNavy
+                                                color = MaterialTheme.colorScheme.primary
                                             )
                                         }
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = if (resultState.languageMode == LanguageMode.MARATHI) q.explanationMarathi else q.explanationEnglish,
+                                            text = expClean,
                                             fontSize = 11.sp,
-                                            color = Color(0xFF334155),
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             lineHeight = 15.sp
                                         )
                                     }

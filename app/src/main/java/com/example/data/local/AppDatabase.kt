@@ -20,7 +20,7 @@ import com.example.data.local.entities.TestPaperEntity
         TestAttemptEntity::class,
         CurrentAffairsEntity::class
     ],
-    version = 1,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

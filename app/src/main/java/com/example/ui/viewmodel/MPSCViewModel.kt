@@ -8,7 +8,10 @@ import com.example.data.local.entities.CurrentAffairsEntity
 import com.example.data.local.entities.QuestionEntity
 import com.example.data.local.entities.TestAttemptEntity
 import com.example.data.local.entities.TestPaperEntity
+import com.example.data.remote.RetrofitClient
 import com.example.data.repository.MPSCRepository
+import com.example.util.cleanHtml
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,12 +21,26 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.math.ceil
 
 enum class LanguageMode { MARATHI, ENGLISH }
 
+enum class AppThemeMode { LIGHT, DARK, SYSTEM }
+
 enum class QuestionState { UNATTEMPTED, ANSWERED, MARKED_FOR_REVIEW, ANSWERED_AND_MARKED }
 
-enum class AppTab { HOME, PYQ_BANK, TEST_SERIES, ANALYTICS, BOOKMARKS }
+enum class AppTab { HOME, PYQ_BANK, TEST_SERIES, ANALYTICS, BOOKMARKS, SYLLABUS }
+
+data class SubscriptionState(
+    val accessGranted: Boolean = true,
+    val isTrialActive: Boolean = true,
+    val trialHoursRemaining: Float = 48.0f,
+    val daysLeftText: String = "2d trial left",
+    val isSubscribed: Boolean = false,
+    val planName: String? = null,
+    val expiryDate: String? = null
+)
 
 data class TestActiveState(
     val testPaper: TestPaperEntity,
@@ -45,17 +62,274 @@ data class TestResultState(
     val languageMode: LanguageMode = LanguageMode.MARATHI
 )
 
+data class UserProfile(
+    val fullName: String = "",
+    val phone: String = "",
+    val email: String = "",
+    val isLoggedIn: Boolean = false
+)
+
 class MPSCViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: MPSCRepository
     private var timerJob: Job? = null
+    private val prefs = application.getSharedPreferences("mpsc_user_prefs", android.content.Context.MODE_PRIVATE)
 
     // UI State
     private val _selectedTab = MutableStateFlow(AppTab.HOME)
     val selectedTab: StateFlow<AppTab> = _selectedTab.asStateFlow()
 
-    private val _selectedLanguage = MutableStateFlow(LanguageMode.MARATHI)
+    private val _selectedLanguage = MutableStateFlow(
+        try {
+            LanguageMode.valueOf(prefs.getString("user_language_mode", LanguageMode.ENGLISH.name) ?: LanguageMode.ENGLISH.name)
+        } catch (e: Exception) {
+            LanguageMode.ENGLISH
+        }
+    )
     val selectedLanguage: StateFlow<LanguageMode> = _selectedLanguage.asStateFlow()
+
+    fun setSelectedLanguage(mode: LanguageMode) {
+        prefs.edit().putString("user_language_mode", mode.name).apply()
+        _selectedLanguage.value = mode
+    }
+
+    private val _appThemeMode = MutableStateFlow(
+        try {
+            AppThemeMode.valueOf(prefs.getString("app_theme_mode", AppThemeMode.DARK.name) ?: AppThemeMode.DARK.name)
+        } catch (e: Exception) {
+            AppThemeMode.DARK
+        }
+    )
+    val appThemeMode: StateFlow<AppThemeMode> = _appThemeMode.asStateFlow()
+
+    private val _isVibrationEnabled = MutableStateFlow(prefs.getBoolean("pref_vibration_enabled", true))
+    val isVibrationEnabled: StateFlow<Boolean> = _isVibrationEnabled.asStateFlow()
+
+    private val _isNotificationsEnabled = MutableStateFlow(prefs.getBoolean("pref_notifications_enabled", true))
+    val isNotificationsEnabled: StateFlow<Boolean> = _isNotificationsEnabled.asStateFlow()
+
+    // Test Series persistent dropdown states
+    private val _selectedTestSeriesExamCategory = MutableStateFlow(prefs.getString("ts_exam_category", "All Exams") ?: "All Exams")
+    val selectedTestSeriesExamCategory: StateFlow<String> = _selectedTestSeriesExamCategory.asStateFlow()
+
+    fun setSelectedTestSeriesExamCategory(category: String) {
+        prefs.edit().putString("ts_exam_category", category).apply()
+        _selectedTestSeriesExamCategory.value = category
+    }
+
+    private val _selectedTestSeriesSubject = MutableStateFlow(prefs.getString("ts_subject", "All Subjects") ?: "All Subjects")
+    val selectedTestSeriesSubject: StateFlow<String> = _selectedTestSeriesSubject.asStateFlow()
+
+    fun setSelectedTestSeriesSubject(subject: String) {
+        prefs.edit().putString("ts_subject", subject).apply()
+        _selectedTestSeriesSubject.value = subject
+    }
+
+    fun setVibrationEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("pref_vibration_enabled", enabled).apply()
+        _isVibrationEnabled.value = enabled
+    }
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("pref_notifications_enabled", enabled).apply()
+        _isNotificationsEnabled.value = enabled
+    }
+
+    private val _userProfile = MutableStateFlow(
+        UserProfile(
+            fullName = prefs.getString("user_name", "") ?: "",
+            phone = prefs.getString("user_phone", "") ?: "",
+            email = prefs.getString("user_email", "") ?: "",
+            isLoggedIn = prefs.getBoolean("is_logged_in", false)
+        )
+    )
+    val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
+
+    private val _subscriptionState = MutableStateFlow(
+        SubscriptionState(
+            accessGranted = true,
+            isSubscribed = true,
+            isTrialActive = false,
+            trialHoursRemaining = 0.0f,
+            daysLeftText = "Free Pro Access"
+        )
+    )
+    val subscriptionState: StateFlow<SubscriptionState> = _subscriptionState.asStateFlow()
+
+    private val _subscriptionPlans = MutableStateFlow<List<com.example.data.remote.ApiSubscriptionPlanItem>>(emptyList())
+    val subscriptionPlans: StateFlow<List<com.example.data.remote.ApiSubscriptionPlanItem>> = _subscriptionPlans.asStateFlow()
+
+    init {
+        checkSubscriptionStatus()
+    }
+
+    fun fetchSubscriptionPlans() {
+        // Subscriptions disabled for current v1 release
+    }
+
+    fun checkSubscriptionStatus() {
+        // ALL USERS GET 100% UNLIMITED FREE PRO ACCESS FOR V1 RELEASE
+        _subscriptionState.value = SubscriptionState(
+            accessGranted = true,
+            isSubscribed = true,
+            isTrialActive = false,
+            trialHoursRemaining = 0.0f,
+            daysLeftText = "Free Pro Access"
+        )
+    }
+
+    fun verifyRazorpayPayment(
+        planId: String,
+        paymentId: String,
+        orderId: String,
+        signature: String = "",
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        val email = _userProfile.value.email
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val resp = RetrofitClient.apiService.verifyPayment(
+                    email = email,
+                    planId = planId,
+                    paymentId = paymentId,
+                    orderId = orderId,
+                    signature = signature
+                )
+                if (resp.status == "success") {
+                    checkSubscriptionStatus()
+                    withContext(Dispatchers.Main) { onResult(true, resp.message) }
+                } else {
+                    withContext(Dispatchers.Main) { onResult(false, resp.message) }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) { onResult(false, "Verification error") }
+            }
+        }
+    }
+
+    fun setAppThemeMode(mode: AppThemeMode) {
+        prefs.edit().putString("app_theme_mode", mode.name).apply()
+        _appThemeMode.value = mode
+    }
+
+    fun updateProfileName(newName: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val currentEmail = _userProfile.value.email
+                val resp = RetrofitClient.apiService.updateProfileName(currentEmail, newName)
+                if (resp.status == "success") {
+                    prefs.edit().putString("user_name", newName).apply()
+                    _userProfile.value = _userProfile.value.copy(fullName = newName)
+                    withContext(Dispatchers.Main) { onResult(true) }
+                } else {
+                    withContext(Dispatchers.Main) { onResult(false) }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) { onResult(false) }
+            }
+        }
+    }
+
+    fun loginAndRegisterUser(
+        fullName: String,
+        phone: String,
+        email: String,
+        onResult: (Boolean, String?) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val response = com.example.data.remote.RetrofitClient.apiService.registerUser(
+                    fullName = fullName,
+                    phone = phone,
+                    email = email
+                )
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (response.status == "error") {
+                        onResult(false, response.message ?: "Registration failed")
+                    } else {
+                        prefs.edit()
+                            .putBoolean("is_logged_in", true)
+                            .putString("user_name", fullName)
+                            .putString("user_phone", phone)
+                            .putString("user_email", email)
+                            .apply()
+
+                        _userProfile.value = UserProfile(
+                            fullName = fullName,
+                            phone = phone,
+                            email = email,
+                            isLoggedIn = true
+                        )
+                        // FIRST ACTION ON LOGIN: Check subscription status from server!
+                        checkSubscriptionStatus()
+                        onResult(true, null)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                prefs.edit()
+                    .putBoolean("is_logged_in", true)
+                    .putString("user_name", fullName)
+                    .putString("user_phone", phone)
+                    .putString("user_email", email)
+                    .apply()
+
+                _userProfile.value = UserProfile(
+                    fullName = fullName,
+                    phone = phone,
+                    email = email,
+                    isLoggedIn = true
+                )
+                // FIRST ACTION ON LOGIN: Check subscription status from server!
+                checkSubscriptionStatus()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onResult(true, null)
+                }
+            }
+        }
+    }
+
+    fun checkUserExisting(email: String, onResult: (com.example.data.remote.ApiUserData?) -> Unit) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val res = com.example.data.remote.RetrofitClient.apiService.checkUser(email = email)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (res.exists && res.user != null) {
+                        onResult(res.user)
+                    } else {
+                        onResult(null)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onResult(null)
+                }
+            }
+        }
+    }
+
+    fun logoutUser() {
+        // 1. Clear SharedPreferences
+        prefs.edit().clear().apply()
+
+        // 2. Clear Room Local Database
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.clearAllLocalData()
+        }
+
+        // 3. Clear In-Memory Session Caches
+        com.example.ui.screens.clearPYQBankSessionCache()
+
+        // 4. Reset All ViewModel States
+        _userProfile.value = UserProfile()
+        _subscriptionState.value = SubscriptionState()
+        _selectedTab.value = AppTab.HOME
+        _activeTestState.value = null
+        _activeResultState.value = null
+    }
 
     // Filters for PYQ Bank
     val selectedExamFilter = MutableStateFlow("All Exams")
@@ -74,8 +348,12 @@ class MPSCViewModel(application: Application) : AndroidViewModel(application) {
     init {
         val database = AppDatabase.getInstance(application)
         repository = MPSCRepository(database)
+        refreshTests()
+    }
+
+    fun refreshTests() {
         viewModelScope.launch {
-            repository.checkAndSeedDatabase()
+            repository.fetchAndSyncTests()
         }
     }
 
@@ -127,16 +405,31 @@ class MPSCViewModel(application: Application) : AndroidViewModel(application) {
     fun startTest(testPaper: TestPaperEntity) {
         viewModelScope.launch {
             val qIds = testPaper.questionIdsJson.split(",").mapNotNull { it.trim().toIntOrNull() }
-            var questions = repository.getQuestionsByIds(qIds)
-            if (questions.isEmpty()) {
-                questions = allQuestions.value.take(testPaper.questionCount)
+            var matchedQuestions = repository.getQuestionsByIds(qIds).toMutableList()
+
+            // Fetch missing questions from remote API if not available in local DB
+            if (qIds.isNotEmpty() && matchedQuestions.size < qIds.size) {
+                val missingIds = qIds.filter { id -> matchedQuestions.none { it.id == id } }
+                if (missingIds.isNotEmpty()) {
+                    repository.fetchAndSyncMissingQuestions(missingIds)
+                    matchedQuestions = repository.getQuestionsByIds(qIds).toMutableList()
+                }
             }
 
-            val initialStateMap = questions.associate { it.id to QuestionState.UNATTEMPTED }
+            // Use exact matched questions without duplicating or padding up to artificial limits
+            val finalQuestions = if (matchedQuestions.isNotEmpty()) {
+                matchedQuestions
+            } else {
+                val pool = allQuestions.value.ifEmpty { com.example.data.local.MPSCInitialData.getInitialQuestions() }
+                val targetCount = minOf(testPaper.questionCount, pool.size)
+                pool.take(targetCount).toMutableList()
+            }
+
+            val initialStateMap = finalQuestions.associate { it.id to QuestionState.UNATTEMPTED }
 
             _activeTestState.value = TestActiveState(
-                testPaper = testPaper,
-                questions = questions,
+                testPaper = testPaper.copy(questionCount = finalQuestions.size),
+                questions = finalQuestions,
                 currentIndex = 0,
                 userAnswers = emptyMap(),
                 questionStates = initialStateMap,
@@ -172,6 +465,12 @@ class MPSCViewModel(application: Application) : AndroidViewModel(application) {
     fun selectTestOption(optionIndex: Int) {
         val state = _activeTestState.value ?: return
         val currentQ = state.questions.getOrNull(state.currentIndex) ?: return
+
+        if (state.userAnswers[currentQ.id] == optionIndex) {
+            clearTestOption()
+            return
+        }
+
         val updatedAnswers = state.userAnswers.toMutableMap()
         updatedAnswers[currentQ.id] = optionIndex
 
@@ -286,8 +585,9 @@ class MPSCViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val positiveScore = correctCount * marksPerQ
-        // MPSC negative marking is 1/4th (0.25) per wrong question
-        val negativeScore = wrongCount * (marksPerQ * 0.25f)
+        // Dynamic negative marking directly from Database (e.g. 0.25 = 1/4th minus mark)
+        val negativeRatio = state.testPaper.negativeMarking
+        val negativeScore = wrongCount * (marksPerQ * negativeRatio)
         val finalScore = maxOf(0.0f, positiveScore - negativeScore)
 
         val totalAttempted = correctCount + wrongCount
@@ -346,6 +646,41 @@ class MPSCViewModel(application: Application) : AndroidViewModel(application) {
                 questions = questions,
                 languageMode = _selectedLanguage.value
             )
+        }
+    }
+
+    fun saveApiQuestionToBookmarks(apiQ: com.example.data.remote.ApiQuestion, isBookmarked: Boolean) {
+        viewModelScope.launch {
+            val qId = apiQ.id?.toIntOrNull() ?: System.currentTimeMillis().toInt()
+            val entity = QuestionEntity(
+                id = qId,
+                examType = (apiQ.examName ?: "MPSC Exam").cleanHtml(),
+                subject = "General Studies",
+                year = apiQ.examYear ?: 2024,
+                questionMarathi = (apiQ.questionMr ?: apiQ.questionEn ?: "").cleanHtml(),
+                questionEnglish = (apiQ.questionEn ?: apiQ.questionMr ?: "").cleanHtml(),
+                option1Marathi = (apiQ.opt1Mr ?: apiQ.opt1En ?: "").cleanHtml(),
+                option1English = (apiQ.opt1En ?: apiQ.opt1Mr ?: "").cleanHtml(),
+                option2Marathi = (apiQ.opt2Mr ?: apiQ.opt2En ?: "").cleanHtml(),
+                option2English = (apiQ.opt2En ?: apiQ.opt2Mr ?: "").cleanHtml(),
+                option3Marathi = (apiQ.opt3Mr ?: apiQ.opt3En ?: "").cleanHtml(),
+                option3English = (apiQ.opt3En ?: apiQ.opt3Mr ?: "").cleanHtml(),
+                option4Marathi = (apiQ.opt4Mr ?: apiQ.opt4En ?: "").cleanHtml(),
+                option4English = (apiQ.opt4En ?: apiQ.opt4Mr ?: "").cleanHtml(),
+                correctOption = apiQ.correctAnswer?.toIntOrNull() ?: 1,
+                explanationMarathi = (apiQ.solutionMr ?: "").cleanHtml(),
+                explanationEnglish = (apiQ.solutionEn ?: "").cleanHtml(),
+                isBookmarked = isBookmarked
+            )
+            repository.saveQuestion(entity)
+        }
+    }
+
+    fun reportQuestion(questionId: Int, reportType: String, comment: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val userEmail = _userProfile.value.email
+            val success = repository.reportQuestion(questionId, userEmail, reportType, comment)
+            onResult(success)
         }
     }
 }

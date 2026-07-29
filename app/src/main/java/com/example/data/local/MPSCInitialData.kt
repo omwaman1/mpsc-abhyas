@@ -224,52 +224,52 @@ object MPSCInitialData {
     fun getInitialTestPapers(): List<TestPaperEntity> {
         return listOf(
             TestPaperEntity(
-                testId = "MPSC_RAJYASEVA_MOCK_1",
-                title = "MPSC Rajyaseva Prelims 2026 Full Mock Test 1",
-                category = "Full Mock Test",
-                examType = "Rajyaseva Prelims",
-                questionCount = 10,
-                totalMarks = 20,
-                durationMinutes = 15,
+                testId = "MPSC_GROUPC_PYQ_2024",
+                title = "MPSC Group B Combined Preliminary Exam 2024 Official Paper (Held On: 02 Feb, 2025).",
+                category = "PYQ",
+                examType = "MPSC Group C",
+                questionCount = 100,
+                totalMarks = 100,
+                durationMinutes = 60,
                 attemptsCount = 18420,
                 isFree = true,
                 questionIdsJson = "1,2,3,4,5,6,7,8,9,10"
             ),
             TestPaperEntity(
-                testId = "MPSC_POLITY_SPECIAL_1",
-                title = "MPSC State Polity & Constitution Booster",
-                category = "Subject Test",
-                examType = "Rajyaseva & Combine",
-                questionCount = 5,
-                totalMarks = 10,
-                durationMinutes = 8,
-                attemptsCount = 12900,
-                isFree = true,
-                questionIdsJson = "2,8,1,4,9"
-            ),
-            TestPaperEntity(
-                testId = "MPSC_COMBINE_PYQ_2023",
-                title = "MPSC Combine Group B & C (2023 PYQ Paper)",
-                category = "PYQ Paper",
-                examType = "Combine Group B & C",
-                questionCount = 6,
-                totalMarks = 12,
-                durationMinutes = 10,
+                testId = "MPSC_GROUPC_PYQ_2023",
+                title = "MPSC Group-B & Group-C Combined Preliminary Exam Official Paper (Held On 30 April, 2023).",
+                category = "PYQ",
+                examType = "MPSC Group C",
+                questionCount = 100,
+                totalMarks = 100,
+                durationMinutes = 60,
                 attemptsCount = 24100,
                 isFree = true,
                 questionIdsJson = "3,4,5,8,9,10"
             ),
             TestPaperEntity(
-                testId = "MPSC_CSAT_SPEED_1",
-                title = "MPSC CSAT Reasoning & Quantitative Aptitude Test",
-                category = "Speed Test",
-                examType = "Rajyaseva Prelims",
-                questionCount = 4,
-                totalMarks = 8,
-                durationMinutes = 5,
-                attemptsCount = 9850,
+                testId = "MPSC_GROUPC_PYQ_2022",
+                title = "MPSC Group C (2022) Prelims Official Paper (Held On: 5 Nov 2022)",
+                category = "PYQ",
+                examType = "MPSC Group C",
+                questionCount = 100,
+                totalMarks = 100,
+                durationMinutes = 60,
+                attemptsCount = 15300,
                 isFree = true,
-                questionIdsJson = "6,4,2,10"
+                questionIdsJson = "1,2,3,4,5"
+            ),
+            TestPaperEntity(
+                testId = "MPSC_GROUPC_FYP_MOCK_1",
+                title = "MPSC Group C FYP Full Length Mock Test 1",
+                category = "MOCK",
+                examType = "MPSC Group C",
+                questionCount = 100,
+                totalMarks = 100,
+                durationMinutes = 60,
+                attemptsCount = 12900,
+                isFree = true,
+                questionIdsJson = "2,8,1,4,9"
             )
         )
     }

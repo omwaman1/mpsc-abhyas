@@ -7,6 +7,8 @@ import androidx.room.PrimaryKey
 data class QuestionEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val examType: String,
+    val majorExamName: String = "",
+    val minorExamName: String = "",
     val subject: String,
     val year: Int,
     val questionMarathi: String,

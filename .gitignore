@@ -11,4 +11,7 @@
 local.properties
 .env
 debug.keystore
+*.jks
+*.keystore
+MPSC_ABHYAS_APP_CREDENTIALS.txt
 test_tmp_file.txt

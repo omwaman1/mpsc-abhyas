@@ -14,7 +14,7 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.mpscprep.qbank"
+    applicationId = "com.mpscabhyas.in"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
@@ -25,11 +25,11 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/mpscabhyas-upload-key.jks"
       storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      storePassword = System.getenv("STORE_PASSWORD") ?: "mpsc1234"
+      keyAlias = "mpscabhyas"
+      keyPassword = System.getenv("KEY_PASSWORD") ?: "mpsc1234"
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -47,6 +47,10 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
+      isCrunchPngs = false
+      isMinifyEnabled = false
+      enableUnitTestCoverage = false
+      enableAndroidTestCoverage = false
       if (file("${rootDir}/debug.keystore").exists()) {
         signingConfig = signingConfigs.getByName("debugConfig")
       }
@@ -59,6 +63,7 @@ android {
   buildFeatures {
     compose = true
     buildConfig = true
+    resValues = false
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
@@ -87,6 +92,7 @@ dependencies {
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.ui)
+  implementation("androidx.compose.ui:ui-text-google-fonts")
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
@@ -103,14 +109,20 @@ dependencies {
   // Uncomment to use Firestore:
   // implementation(libs.firebase.firestore)
 
-  // Firebase Auth with Google Sign-In requires all of the following to be uncommented together.
-  // If you are using Firebase Auth with other providers (e.g. Email/Password), you may only need
-  // firebase-auth.
-  // implementation(libs.firebase.auth)
-  // implementation(libs.androidx.credentials)
-  // implementation(libs.androidx.credentials.play.services)
-  // implementation(libs.googleid)
+  // Firebase Auth & Google Credential Manager with Google Sign-In
+  implementation(libs.firebase.auth)
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play.services)
+  implementation(libs.googleid)
+  implementation("com.google.android.gms:play-services-auth:21.3.0")
   implementation(libs.firebase.appcheck.recaptcha)
+
+  // Razorpay Payment Gateway SDK (Excluding transitive core to fix AGP namespace collision)
+  implementation("com.razorpay:checkout:1.6.38") {
+      exclude(group = "com.razorpay", module = "core")
+  }
+  // Google Play In-App Update SDK
+  implementation("com.google.android.play:app-update-ktx:2.1.0")
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.logging.interceptor)

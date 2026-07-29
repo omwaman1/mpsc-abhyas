@@ -8,25 +8,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = TestbookEmerald,
-    secondary = TestbookNavyLight,
-    tertiary = TestbookGold,
-    background = BackgroundDark,
-    surface = SurfaceDark,
-    onPrimary = Color.Black,
-    onSecondary = Color.White,
-    onBackground = TextPrimaryDark,
-    onSurface = TextPrimaryDark
+    primary = GooglePastelBlue, // Soft Pastel Blue
+    secondary = GooglePastelGreen, // Soft Pastel Green
+    tertiary = GooglePastelYellow, // Soft Pastel Yellow
+    error = GooglePastelRed, // Soft Pastel Red
+    background = BackgroundDark, // Dark Charcoal / Off-Black (#121212)
+    surface = SurfaceDark, // Dark Gray / Slate Gray (#1E1E1E)
+    surfaceVariant = SurfaceVariantDark, // (#2C2C2C)
+    onPrimary = Color(0xFF0F172A),
+    onSecondary = Color(0xFF0F172A),
+    onBackground = TextPrimaryDark, // Off-White / Soft White (#F8FAFC)
+    onSurface = TextPrimaryDark, // Off-White / Soft White (#F8FAFC)
+    onSurfaceVariant = TextSecondaryDark, // Light Gray / Medium Gray (#94A3B8)
+    outline = Color(0xFF333333)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = TestbookNavy,
+    primary = MpscNavy,
     onPrimary = Color.White,
     primaryContainer = Color(0xFFE2E8F0),
-    secondary = TestbookEmerald,
+    secondary = MpscEmerald,
     onSecondary = Color.White,
-    secondaryContainer = TestbookEmeraldLight,
-    tertiary = TestbookOrange,
+    secondaryContainer = MpscEmeraldLight,
+    tertiary = MpscOrange,
     background = BackgroundLight,
     surface = SurfaceLight,
     onBackground = TextPrimaryLight,
@@ -46,4 +50,3 @@ fun MPSCPrepTheme(
         content = content
     )
 }
-

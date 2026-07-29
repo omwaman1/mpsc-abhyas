@@ -23,4 +23,7 @@ interface TestPaperDao {
 
     @Query("SELECT COUNT(*) FROM test_papers")
     suspend fun getTestPaperCount(): Int
+
+    @Query("DELETE FROM test_papers")
+    suspend fun deleteAllTestPapers()
 }
