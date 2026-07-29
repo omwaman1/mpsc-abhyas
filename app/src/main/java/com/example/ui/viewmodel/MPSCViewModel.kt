@@ -656,7 +656,7 @@ class MPSCViewModel(application: Application) : AndroidViewModel(application) {
                 id = qId,
                 examType = (apiQ.examName ?: "MPSC Exam").cleanHtml(),
                 subject = "General Studies",
-                year = apiQ.examYear ?: 2024,
+                year = apiQ.examYear?.toString()?.toIntOrNull() ?: 2024,
                 questionMarathi = (apiQ.questionMr ?: apiQ.questionEn ?: "").cleanHtml(),
                 questionEnglish = (apiQ.questionEn ?: apiQ.questionMr ?: "").cleanHtml(),
                 option1Marathi = (apiQ.opt1Mr ?: apiQ.opt1En ?: "").cleanHtml(),

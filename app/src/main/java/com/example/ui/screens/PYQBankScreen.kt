@@ -402,11 +402,12 @@ fun PYQBankScreen(
 
                     1 -> { // Exam-wise View
                         val majorSections = remember(exams) {
-                            val majors = exams.filter { it.parentId == 0 || it.id in 1..3 }
-                            val minorsMap = exams.filter { it.parentId > 0 }.groupBy { it.parentId }
+                            val majors = exams.filter { (it.parentId?.toString()?.toIntOrNull() ?: 0) == 0 || (it.id?.toString()?.toIntOrNull() ?: 0) in 1..3 }
+                            val minorsMap = exams.filter { (it.parentId?.toString()?.toIntOrNull() ?: 0) > 0 }.groupBy { (it.parentId?.toString()?.toIntOrNull() ?: 0) }
                             
                             majors.map { major ->
-                                val minors = minorsMap[major.id] ?: emptyList()
+                                val majorIdInt = major.id?.toString()?.toIntOrNull() ?: 0
+                                val minors = minorsMap[majorIdInt] ?: emptyList()
                                 Pair(major, minors)
                             }
                         }
@@ -430,15 +431,15 @@ fun PYQBankScreen(
 
                                 val allSectionCards = listOf(majorExam) + subExams
                                 itemsIndexed(allSectionCards) { _, examCategory ->
-                                    val isMajor = examCategory.parentId == 0
+                                    val isMajor = (examCategory.parentId?.toString()?.toIntOrNull() ?: 0) == 0
                                     SubjectExamCard(
                                         number = String.format("%02d", subCounter++),
                                         titleMr = examCategory.categoryName,
-                                        titleEn = "${examCategory.yearCount} Years",
-                                        pyqCount = "${examCategory.pyqCount}",
+                                        titleEn = "${examCategory.yearCount ?: 0} Years",
+                                        pyqCount = "${examCategory.pyqCount ?: 0}",
                                         onClick = {
                                             selectedExamCategory = examCategory.categoryName
-                                            selectedExamCategoryPyqs = examCategory.pyqCount
+                                            selectedExamCategoryPyqs = examCategory.pyqCount?.toString()?.toIntOrNull() ?: 0
                                         }
                                     )
                                 }
