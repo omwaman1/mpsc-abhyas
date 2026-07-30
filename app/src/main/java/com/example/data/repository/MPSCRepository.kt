@@ -112,26 +112,27 @@ class MPSCRepository(private val db: AppDatabase) {
 
                 response.testSeries.forEach { ts ->
                     val qIds = ts.questionIds ?: ""
-                    val parsedQCount = ts.questionCount ?: 0
+                    val parsedQCount = ts.questionCount?.toString()?.toIntOrNull() ?: 0
                     val qCount = if (parsedQCount > 0) parsedQCount else qIds.split(",").filter { it.isNotBlank() }.size
                     val finalCount = if (qCount > 0) qCount else 100
-                    val duration = ts.durationMinutes ?: (if (finalCount >= 100) 60 else 30)
-                    val marks = ts.totalMarks ?: finalCount
-                    val negative = ts.negativeMarking ?: 0.25f
+                    val duration = ts.durationMinutes?.toString()?.toIntOrNull() ?: (if (finalCount >= 100) 60 else 30)
+                    val marks = ts.totalMarks?.toString()?.toIntOrNull() ?: finalCount
+                    val negative = ts.negativeMarking?.toString()?.toFloatOrNull() ?: 0.25f
+                    val tsIdStr = ts.id ?: "0"
 
                     remoteTests.add(
                         TestPaperEntity(
-                            testId = "TS_${ts.id}",
-                            title = ts.title,
-                            category = if (!ts.category.isNullOrBlank()) ts.category else "PYQ",
-                            examType = if (!ts.examName.isNullOrBlank()) ts.examName else "MPSC Group C",
+                            testId = "TS_${tsIdStr}",
+                            title = ts.title.takeIf { !it.isNullOrBlank() } ?: "MPSC Practice Paper",
+                            category = if (!ts.category.isNullOrBlank()) ts.category!! else "PYQ",
+                            examType = if (!ts.examName.isNullOrBlank()) ts.examName!! else "MPSC Group C",
                             subjectName = ts.subjectName ?: "",
-                            subjectId = ts.subjectId ?: 0,
+                            subjectId = ts.subjectId?.toString()?.toIntOrNull() ?: 0,
                             questionCount = finalCount,
                             totalMarks = marks,
                             durationMinutes = duration,
                             negativeMarking = negative,
-                            attemptsCount = 5000 + (ts.id.hashCode() % 5000).let { if (it < 0) -it else it },
+                            attemptsCount = 5000 + (tsIdStr.hashCode() % 5000).let { if (it < 0) -it else it },
                             isFree = true,
                             questionIdsJson = qIds
                         )

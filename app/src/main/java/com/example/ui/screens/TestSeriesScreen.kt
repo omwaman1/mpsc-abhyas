@@ -67,18 +67,20 @@ import com.example.ui.viewmodel.LanguageMode
 
 enum class TestSeriesGroupTab { PYP, FYP }
 
-fun isPaperPyp(paper: TestPaperEntity): Boolean {
-    val cat = paper.category.trim()
+fun isPaperPyp(paper: TestPaperEntity?): Boolean {
+    if (paper == null) return false
+    val cat = (paper.category ?: "").trim()
     return cat.equals("PYQ", ignoreCase = true) || cat.equals("PYP", ignoreCase = true)
 }
 
-fun getEffectiveSubjectName(paper: TestPaperEntity): String {
-    val sub = paper.subjectName.trim()
+fun getEffectiveSubjectName(paper: TestPaperEntity?): String {
+    if (paper == null) return "General"
+    val sub = (paper.subjectName ?: "").trim()
     if (sub.isNotBlank() && !sub.equals("General", ignoreCase = true) && !sub.contains("General") && !sub.contains("सर्व विषय")) {
         return sub
     }
     
-    val titleLower = paper.title.lowercase()
+    val titleLower = (paper.title ?: "").lowercase()
     return when {
         titleLower.contains("economy") || titleLower.contains("economic") || titleLower.contains("अर्थशास्त्र") || titleLower.contains("अर्थव्यवस्था") || titleLower.contains("income") || titleLower.contains("gdp") || titleLower.contains("mt 1") || titleLower.contains("mt 2") -> "अर्थव्यवस्था"
         titleLower.contains("history") || titleLower.contains("इतिहास") || titleLower.contains("tt 1") || titleLower.contains("tt 5") || titleLower.contains("tt 10") || titleLower.contains("ct 1") || titleLower.contains("ct 2") || titleLower.contains("ct 3") || titleLower.contains("ct 7") || titleLower.contains("ct 8") -> "इतिहास"
@@ -90,8 +92,8 @@ fun getEffectiveSubjectName(paper: TestPaperEntity): String {
     }
 }
 
-fun getDifficultyBadge(paper: TestPaperEntity): Triple<String, Color, Color> {
-    val titleLower = paper.title.lowercase()
+fun getDifficultyBadge(paper: TestPaperEntity?): Triple<String, Color, Color> {
+    val titleLower = (paper?.title ?: "").lowercase()
     return when {
         titleLower.contains("easy") || titleLower.contains("basic") || titleLower.contains("सोपे") || titleLower.contains("mt 2") -> {
             Triple("EASY", Color(0xFF34D399).copy(alpha = 0.15f), Color(0xFF34D399))
@@ -257,7 +259,7 @@ private fun TestSeriesGroupPage(
 
     val examCategoryChips = remember(groupFilteredPapers) {
         val list = mutableListOf("All Exams")
-        val distinctExams = groupFilteredPapers.map { it.examType.trim() }.distinct().filter { it.isNotBlank() }
+        val distinctExams = groupFilteredPapers.map { (it.examType ?: "").trim() }.distinct().filter { it.isNotBlank() }
         list.addAll(distinctExams)
         list.distinct()
     }
@@ -265,7 +267,7 @@ private fun TestSeriesGroupPage(
     val examFilteredPapers = remember(selectedExamCategory, groupFilteredPapers) {
         groupFilteredPapers.filter { paper ->
             selectedExamCategory == "All Exams" || 
-            paper.examType.trim().equals(selectedExamCategory.trim(), ignoreCase = true)
+            (paper.examType ?: "").trim().equals(selectedExamCategory.trim(), ignoreCase = true)
         }
     }
 

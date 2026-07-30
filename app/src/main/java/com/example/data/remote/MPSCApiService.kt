@@ -254,20 +254,20 @@ data class ApiTestsResponse(
 
 @JsonClass(generateAdapter = true)
 data class ApiTestSeriesItem(
-    @Json(name = "id") val id: String,
-    @Json(name = "title") val title: String,
+    @Json(name = "id") val id: String? = "0",
+    @Json(name = "title") val title: String? = "",
     @Json(name = "exam_name") val examName: String? = null,
     @Json(name = "category") val category: String? = "Speed Test",
     @Json(name = "subject_name") val subjectName: String? = null,
-    @Json(name = "subject_id") val subjectId: Int? = 0,
-    @Json(name = "duration_minutes") val durationMinutes: Int? = 60,
-    @Json(name = "total_marks") val totalMarks: Int? = 100,
-    @Json(name = "negative_marking") val negativeMarking: Float? = 0.25f,
+    @Json(name = "subject_id") val subjectId: Any? = 0,
+    @Json(name = "duration_minutes") val durationMinutes: Any? = 60,
+    @Json(name = "total_marks") val totalMarks: Any? = 100,
+    @Json(name = "negative_marking") val negativeMarking: Any? = 0.25f,
     @Json(name = "price") val price: String? = null,
     @Json(name = "max_attempts") val maxAttempts: String? = null,
     @Json(name = "question_ids") val questionIds: String? = null,
     @Json(name = "is_published") val isPublished: String? = null,
-    @Json(name = "question_count") val questionCount: Int? = 0
+    @Json(name = "question_count") val questionCount: Any? = 0
 )
 
 @JsonClass(generateAdapter = true)
